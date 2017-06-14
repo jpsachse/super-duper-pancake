@@ -11,7 +11,7 @@ enum CommentClass {
     Unknown,
 }
 
-export class CommentsClassifier {
+export default class CommentsClassifier {
 
 // Comment categories from "Quality analysis of source code comments."
 //   - Copyright comments
@@ -31,23 +31,31 @@ export class CommentsClassifier {
 
     private isCommentedCode(commentText: string): boolean {
         const linter = this.setupLinter();
+        const configuration = this.getLintConfiguration();
+        linter.lint("tmpFile", commentText, configuration);
         return false;
     }
 
     private setupLinter(): Lint.Linter {
         const options = {
             fix: false,
-            rulesDirectory: ["./rules"], ///Users/janphilippsachse/Documents/Studium_lokal/Master/Masterarbeit/ts_rules/
+            // This either has to be relative to the file that calls classify() or the directory,
+            // in which tslint is called, which is kind of ridiculous.
+            rulesDirectory: ["../repo/project/rules/no-code"],
         };
+        return new Lint.Linter(options);
+    }
+
+    private getLintConfiguration() {
         const linterRules: Map<string, Partial<Lint.IOptions>> = new Map();
         linterRules.set("no-code", {ruleName: "no-code"});
         const configuration = {
             extends: [],
             jsRules: new Map<string, object>(),
             rules: linterRules,
-            rulesDirectory: ["./rules"],
+            rulesDirectory: ["../repo/project/rules/no-code"],
         };
-        return new Lint.Linter(options);
+        return configuration;
     }
 
     private isLicence(): boolean {
