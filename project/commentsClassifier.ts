@@ -1,7 +1,7 @@
 import * as Lint from "tslint";
 import * as utils from "tsutils";
 
-enum CommentClass {
+export enum CommentClass {
     Copyright,
     Header,
     Inline,
@@ -11,7 +11,7 @@ enum CommentClass {
     Unknown,
 }
 
-export default class CommentsClassifier {
+export class CommentsClassifier {
 
 // Comment categories from "Quality analysis of source code comments."
 //   - Copyright comments
@@ -32,8 +32,23 @@ export default class CommentsClassifier {
     private isCommentedCode(commentText: string): boolean {
         const linter = this.setupLinter();
         const configuration = this.getLintConfiguration();
-        linter.lint("tmpFile", commentText, configuration);
-        return false;
+        const cleanedText = this.stripCommentTokens(commentText);
+        linter.lint("tmpFile", cleanedText, configuration);
+        const result = linter.getResult();
+        let containsCode = false;
+        result.failures.forEach((failure) => {
+            if (failure.getRuleName() === "no-code") {
+                console.log("contains code!");
+                containsCode = true;
+                return;
+            }
+        });
+        return containsCode;
+    }
+
+    private stripCommentTokens(text: string): string {
+        const re = /^\s*(\/\/)|(\/\*)/;
+        return text.replace(re, "");
     }
 
     private setupLinter(): Lint.Linter {
@@ -46,7 +61,7 @@ export default class CommentsClassifier {
         return new Lint.Linter(options);
     }
 
-    private getLintConfiguration() {
+    private getLintConfiguration(): Lint.Configuration.IConfigurationFile {
         const linterRules: Map<string, Partial<Lint.IOptions>> = new Map();
         linterRules.set("no-code", {ruleName: "no-code"});
         const configuration = {
