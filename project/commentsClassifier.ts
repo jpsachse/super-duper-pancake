@@ -1,5 +1,6 @@
 import * as Lint from "tslint";
 import * as utils from "tsutils";
+import {ICommentPart, SourceComment} from "./sourceComment";
 
 export enum CommentClass {
     Copyright,
@@ -35,8 +36,8 @@ export class CommentsClassifier {
     constructor(private ruleLocation: string) {
     }
 
-    public classify(commentText: string): ICommentClassification {
-        commentText = this.stripCommentStartTokens(commentText);
+    public classify(comment: SourceComment): ICommentClassification {
+        const commentText = this.stripCommentStartTokens(comment.getCompleteComment().text);
         const result = {
             commentClass: CommentClass.Unknown,
             note: undefined,

@@ -2,6 +2,7 @@ import * as Lint from "tslint";
 import * as Utils from "tsutils";
 import * as ts from "typescript";
 import {CommentClass, CommentsClassifier} from "./commentsClassifier";
+import {SourceComment} from "./sourceComment";
 
 interface ICommentGroup {
     pos: number;
@@ -18,7 +19,7 @@ export class CommentClassificationWalker extends Lint.AbstractWalker<Set<string>
         const mergedComments = this.getMergedComments(sourceFile);
         Utils.forEachComment(sourceFile, (fullText, range) => {
             const text = fullText.substring(range.pos, range.end);
-            const classification = classifier.classify(text);
+            const classification = classifier.classify(new SourceComment(range.pos, range.end, text));
             if (classification.commentClass === CommentClass.Code) {
                 const failureText = classification.note || "No Code in comments";
                 this.addFailure(range.pos, range.end, failureText);
