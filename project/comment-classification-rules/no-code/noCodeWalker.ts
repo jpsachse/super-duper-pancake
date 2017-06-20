@@ -18,7 +18,7 @@ export class NoCodeWalker extends Lint.AbstractWalker<void> {
             return ts.forEachChild(node, visitNode);
         };
         ts.forEachChild(sourceFile, visitNode);
-        if (codeLength / totalLength >= 0.5) {
+        if (codeLength / totalLength >= 0.75) {
             this.addFailure(0, totalLength, NoCodeWalker.FAILURE_MESSAGE);
         }
     }

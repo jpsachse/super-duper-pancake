@@ -11,6 +11,16 @@ export enum CommentClass {
     Unknown,
 }
 
+export interface ICommentClassification {
+    commentClass: CommentClass;
+    note: string;
+}
+
+interface IInternalClassificationResult {
+    matchesClass: boolean;
+    note: string;
+}
+
 export class CommentsClassifier {
 
 // Comment categories from "Quality analysis of source code comments."
@@ -22,41 +32,51 @@ export class CommentsClassifier {
 //   - Code comments
 //   - Task comments
 
-    public classify(commentText: string): CommentClass {
-        if (this.isCommentedCode(commentText)) {
-            return CommentClass.Code;
-        }
-        return CommentClass.Unknown;
+    constructor(private ruleLocation: string) {
     }
 
-    private isCommentedCode(commentText: string): boolean {
+    public classify(commentText: string): ICommentClassification {
+        commentText = this.stripCommentStartTokens(commentText);
+        const result = {
+            commentClass: CommentClass.Unknown,
+            note: undefined,
+        };
+        let classificationResult;
+        classificationResult = this.isCommentedCode(commentText);
+        if (classificationResult.matchesClass) {
+            result.commentClass = CommentClass.Code;
+        }
+        result.note = classificationResult.note;
+        return result;
+    }
+
+    private isCommentedCode(commentText: string): IInternalClassificationResult {
         const linter = this.setupLinter();
         const configuration = this.getLintConfiguration();
-        const cleanedText = this.stripCommentTokens(commentText);
-        linter.lint("tmpFile", cleanedText, configuration);
+        linter.lint("tmpFile", commentText, configuration);
         const result = linter.getResult();
         let containsCode = false;
+        let failureText;
         result.failures.forEach((failure) => {
             if (failure.getRuleName() === "no-code") {
-                console.log("contains code!");
                 containsCode = true;
+                failureText = failure.getFailure();
                 return;
             }
         });
-        return containsCode;
+        return {matchesClass: containsCode, note: failureText};
     }
 
-    private stripCommentTokens(text: string): string {
-        const re = /^\s*(\/\/)|(\/\*)/;
+    private stripCommentStartTokens(text: string): string {
+        const re = /^(\s*((\/\/+)|(\/\*\**)|(\*\/)|(\**)))*/mg;
         return text.replace(re, "");
     }
 
     private setupLinter(): Lint.Linter {
         const options = {
             fix: false,
-            // This either has to be relative to the file that calls classify() or the directory,
-            // in which tslint is called, which is kind of ridiculous.
-            rulesDirectory: ["../repo/project/rules/no-code"],
+            // This has to be relative to the directory in which tslint is called, which is kind of ridiculous.
+            rulesDirectory: [this.ruleLocation],
         };
         return new Lint.Linter(options);
     }
@@ -68,7 +88,7 @@ export class CommentsClassifier {
             extends: [],
             jsRules: new Map<string, object>(),
             rules: linterRules,
-            rulesDirectory: ["../repo/project/rules/no-code"],
+            rulesDirectory: [this.ruleLocation],
         };
         return configuration;
     }
