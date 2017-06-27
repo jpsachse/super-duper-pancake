@@ -10,7 +10,7 @@ interface ICommentGroup {
     comments: string[];
 }
 
-export class CommentClassificationWalker extends Lint.AbstractWalker<Set<string>> {
+export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
 
     public walk(sourceFile: ts.SourceFile) {
         // Hey, there is a comment!
