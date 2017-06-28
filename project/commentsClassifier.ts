@@ -12,9 +12,15 @@ export enum CommentClass {
     Unknown,
 }
 
-export interface ICommentClassification {
+interface ICommentClassification {
+    line: number;
     commentClass: CommentClass;
     note: string;
+}
+
+export interface ICommentClassificationResult {
+    comment: SourceComment;
+    classifications: ICommentClassification[];
 }
 
 interface IInternalClassificationResult {
@@ -36,18 +42,27 @@ export class CommentsClassifier {
     constructor(private ruleLocation: string) {
     }
 
-    public classify(comment: SourceComment): ICommentClassification {
-        const commentText = this.stripCommentStartTokens(comment.getCompleteComment().text);
+    public classify(comment: SourceComment): ICommentClassificationResult {
+        const commentText = comment.getSanitizedCommentText().text;
+        const sanitizedLines = comment.getSanitizedCommentLines();
         const result = {
-            commentClass: CommentClass.Unknown,
-            note: undefined,
+            classifications: [],
+            comment,
         };
-        let classificationResult;
-        classificationResult = this.isCommentedCode(commentText);
-        if (classificationResult.matchesClass) {
-            result.commentClass = CommentClass.Code;
-        }
-        result.note = classificationResult.note;
+        sanitizedLines.forEach( (line, index) => {
+            let classificationResult;
+            const classification = {
+                commentClass: CommentClass.Unknown,
+                line: index,
+                note: undefined,
+            };
+            classificationResult = this.isCommentedCode(commentText);
+            if (classificationResult.matchesClass) {
+                classification.commentClass = CommentClass.Code;
+                classification.note = classificationResult.note;
+            }
+            result.classifications.push(classification);
+        });
         return result;
     }
 
@@ -66,11 +81,6 @@ export class CommentsClassifier {
             }
         });
         return {matchesClass: containsCode, note: failureText};
-    }
-
-    private stripCommentStartTokens(text: string): string {
-        const re = /^(\s*((\/\/+)|(\/\*\**)|(\*\/)|(\**)))*/mg;
-        return text.replace(re, "");
     }
 
     private setupLinter(): Lint.Linter {

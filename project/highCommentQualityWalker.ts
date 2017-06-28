@@ -16,14 +16,17 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
         // Hey, there is a comment!
         // TODO: use this.options() instead of hardcoded string
         const classifier = new CommentsClassifier("./comment-classification-rules/no-code");
-        const mergedComments = this.getMergedComments(sourceFile);
+        // const mergedComments = this.getMergedComments(sourceFile);
         Utils.forEachComment(sourceFile, (fullText, range) => {
             const text = fullText.substring(range.pos, range.end);
-            const classification = classifier.classify(new SourceComment(range.pos, range.end, text));
-            if (classification.commentClass === CommentClass.Code) {
-                const failureText = classification.note || "No Code in comments";
-                this.addFailure(range.pos, range.end, failureText);
-            }
+            const classificationResult = classifier.classify(new SourceComment(range.pos, range.end, text));
+            classificationResult.classifications.forEach( (classification) => {
+                if (classification.commentClass === CommentClass.Code) {
+                    const pos = classificationResult.comment.getCommentParts()[classification.line].pos;
+                    const end = classificationResult.comment.getCommentParts()[classification.line].end;
+                    this.addFailure(pos, end, classification.note);
+                }
+            });
         });
         // mergedComments.forEach((commentGroup) => {
         //     const text = commentGroup.comments.join("\n");
