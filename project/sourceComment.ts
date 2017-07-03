@@ -25,6 +25,13 @@ export class SourceComment {
         };
     }
 
+    public inspect(depth, opts) {
+        const parts = this.commentParts.map<string>( (part) => {
+            return "(" + part.pos + "-" + part.end + ") " + part.text;
+        }).join(",\n");
+        return "SourceComment [ " + parts + " ]";
+    }
+
     // Returns the complete comment text but without the usual comment chrome around it.
     // Leaves start and end position as they were in the original source file,
     // including the removed chrome.
@@ -34,7 +41,7 @@ export class SourceComment {
         return comment;
     }
 
-    public getSanitizedCommentLines() {
+    public getSanitizedCommentLines(): ICommentPart[] {
         const sanitizedComments = this.commentParts.map( (part) => {
             const cleansedText = this.stripCommentStartTokens(part.text);
             let pos = part.pos;
@@ -50,8 +57,7 @@ export class SourceComment {
                 return result;
             });
         });
-        return sanitizedComments;
-        // return [].concat(...sanitizedComments);
+        return [].concat(...sanitizedComments);
     }
 
     public getCommentParts(): ICommentPart[] {

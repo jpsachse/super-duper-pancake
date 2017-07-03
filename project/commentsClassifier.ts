@@ -1,6 +1,7 @@
 import * as Lint from "tslint";
 import * as utils from "tsutils";
-import {ICommentPart, SourceComment} from "./sourceComment";
+import { CodeDetector } from "./codeDetector";
+import { ICommentPart, SourceComment } from "./sourceComment";
 
 export enum CommentClass {
     Copyright,
@@ -25,7 +26,7 @@ export interface ICommentClassificationResult {
 
 interface IInternalClassificationResult {
     matchesClass: boolean;
-    note: string;
+    description: string;
 }
 
 export class CommentsClassifier {
@@ -39,7 +40,7 @@ export class CommentsClassifier {
 //   - Code comments
 //   - Task comments
 
-    constructor(private ruleLocation: string) {
+    constructor(private codeDetector: CodeDetector) {
     }
 
     public classify(comment: SourceComment): ICommentClassificationResult {
@@ -56,52 +57,30 @@ export class CommentsClassifier {
                 line: index,
                 note: undefined,
             };
-            classificationResult = this.isCommentedCode(commentText);
+            classificationResult = this.isCommentedCode(line.text);
             if (classificationResult.matchesClass) {
                 classification.commentClass = CommentClass.Code;
-                classification.note = classificationResult.note;
+                classification.note = classificationResult.description;
             }
-            result.classifications.push(classification);
+            if (classification.commentClass !== CommentClass.Unknown) {
+                result.classifications.push(classification);
+            }
         });
         return result;
     }
 
+    private isLicense(commentText: string): IInternalClassificationResult {
+        // Should also take position inside the file into account, i.e., most licenses
+        // are at the beginning of a file and not somewhere in the middle.
+        const licensePattern = /license/i;
+        return { matchesClass: commentText.search(licensePattern) >= 0, description: "That's a license" };
+    }
+
     private isCommentedCode(commentText: string): IInternalClassificationResult {
-        const linter = this.setupLinter();
-        const configuration = this.getLintConfiguration();
-        linter.lint("tmpFile", commentText, configuration);
-        const result = linter.getResult();
-        let containsCode = false;
-        let failureText;
-        result.failures.forEach((failure) => {
-            if (failure.getRuleName() === "no-code") {
-                containsCode = true;
-                failureText = failure.getFailure();
-                return;
-            }
-        });
-        return {matchesClass: containsCode, note: failureText};
-    }
-
-    private setupLinter(): Lint.Linter {
-        const options = {
-            fix: false,
-            // This has to be relative to the directory in which tslint is called, which is kind of ridiculous.
-            rulesDirectory: [this.ruleLocation],
-        };
-        return new Lint.Linter(options);
-    }
-
-    private getLintConfiguration(): Lint.Configuration.IConfigurationFile {
-        const linterRules: Map<string, Partial<Lint.IOptions>> = new Map();
-        linterRules.set("no-code", {ruleName: "no-code"});
-        const configuration = {
-            extends: [],
-            jsRules: new Map<string, object>(),
-            rules: linterRules,
-            rulesDirectory: [this.ruleLocation],
-        };
-        return configuration;
+        if (this.codeDetector.isCommentedCode(commentText)) {
+            return {matchesClass: true, description: "Code should not be commented out"};
+        }
+        return {matchesClass: false, description: undefined};
     }
 
     private isLicence(): boolean {
