@@ -5,6 +5,7 @@ import { CommentClass, CommentsClassifier } from "./commentsClassifier";
 import { CustomCodeDetector } from "./customCodeDetector";
 import { ExistingRuleBasedCodeDetector } from "./existingRuleBasedCodeDetector";
 import { SourceComment } from "./sourceComment";
+import { TsCompilerBasedCodeDetector } from "./tsCompilerBasedCodeDetector";
 
 interface ICommentGroup {
     pos: number;
@@ -19,8 +20,9 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
         // TODO: use this.options() instead of hardcoded string
         // Also: provide an option to choose from different code detection methods
         // const codeDetector = new CustomCodeDetector("./comment-classification-rules/no-code")
-        const ruleDirectory = "./node_modules/tslint/lib/rules";
-        const codeDetector = new ExistingRuleBasedCodeDetector(ruleDirectory);
+        // const ruleDirectory = "./node_modules/tslint/lib/rules";
+        // const codeDetector = new ExistingRuleBasedCodeDetector(ruleDirectory);
+        const codeDetector = new TsCompilerBasedCodeDetector();
         const classifier = new CommentsClassifier(codeDetector);
         const mergedComments = this.getMergedComments(sourceFile);
         // Utils.forEachComment(sourceFile, (fullText, range) => {
