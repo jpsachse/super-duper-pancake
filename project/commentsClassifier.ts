@@ -13,7 +13,7 @@ export enum CommentClass {
     Unknown,
 }
 
-interface ICommentClassification {
+export interface ICommentClassification {
     line: number;
     commentClass: CommentClass;
     note: string;

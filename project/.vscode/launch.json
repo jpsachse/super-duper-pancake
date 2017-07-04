@@ -1,0 +1,28 @@
+{
+    // Verwendet IntelliSense zum Ermitteln möglicher Node.js-Debugattribute.
+    // Zeigen Sie auf vorhandene Attribute, um die zugehörigen Beschreibungen anzuzeigen.
+    // Weitere Informationen finden Sie unter https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug CLI",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceRoot}/node_modules/tslint/lib/tslint-cli.js",
+            "stopOnEntry": false,
+            "args": [ "${workspaceRoot}/test_files/lintThis.ts" ],
+            "cwd": "${workspaceRoot}",
+            "preLaunchTask": "tsc",
+            "runtimeExecutable": null,
+            "runtimeArgs": [
+                "--nolazy"
+            ],
+            "env": {
+                "NODE_ENV": "development"
+            },
+            "console": "internalConsole",
+            "sourceMaps": true,
+            "outFiles": ["${workspaceRoot}/build/**/*.js"]
+        }
+    ]
+}
