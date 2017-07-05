@@ -1,6 +1,7 @@
 import * as Lint from "tslint";
 import * as utils from "tsutils";
 import { CodeDetector } from "./codeDetector";
+import { LicenseMatcher } from "./licenseMatcher";
 import { ICommentPart, SourceComment } from "./sourceComment";
 
 export enum CommentClass {
@@ -50,8 +51,15 @@ export class CommentsClassifier {
             classifications: [],
             comment,
         };
+        let classificationResult = this.isLicense(comment);
+        if (classificationResult.matchesClass) {
+            result.classifications.push({
+                commentClass: CommentClass.Copyright,
+                 line: 0,
+                 note: classificationResult.description,
+            });
+        }
         sanitizedLines.forEach( (line, index) => {
-            let classificationResult;
             const classification = {
                 commentClass: CommentClass.Unknown,
                 line: index,
@@ -69,11 +77,11 @@ export class CommentsClassifier {
         return result;
     }
 
-    private isLicense(commentText: string): IInternalClassificationResult {
+    private isLicense(comment: SourceComment): IInternalClassificationResult {
+        const matcher = new LicenseMatcher();
         // Should also take position inside the file into account, i.e., most licenses
         // are at the beginning of a file and not somewhere in the middle.
-        const licensePattern = /license/i;
-        return { matchesClass: commentText.search(licensePattern) >= 0, description: "That's a license" };
+        return { matchesClass: matcher.isLicense(comment), description: "That's a license" };
     }
 
     private isCommentedCode(commentText: string): IInternalClassificationResult {
@@ -81,10 +89,6 @@ export class CommentsClassifier {
             return {matchesClass: true, description: "Code should not be commented out"};
         }
         return {matchesClass: false, description: undefined};
-    }
-
-    private isLicence(): boolean {
-        return false;
     }
 
 }

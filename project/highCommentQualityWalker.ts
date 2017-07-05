@@ -39,7 +39,8 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
         mergedComments.forEach((commentGroup) => {
             const classificationResult = classifier.classify(commentGroup);
             classificationResult.classifications.forEach( (classification) => {
-                if (classification.commentClass === CommentClass.Code) {
+                if (classification.commentClass === CommentClass.Code ||
+                        classification.commentClass === CommentClass.Copyright) {
                     const comment = classificationResult.comment.getSanitizedCommentLines()[classification.line];
                     const pos = comment.pos;
                     const end = comment.end;
