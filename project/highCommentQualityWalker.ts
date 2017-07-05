@@ -1,7 +1,8 @@
 import * as Lint from "tslint";
 import * as Utils from "tsutils";
 import * as ts from "typescript";
-import { CommentClass, CommentsClassifier } from "./commentsClassifier";
+import { CommentClass } from "./commentClassificationTypes";
+import { CommentsClassifier } from "./commentsClassifier";
 import { CustomCodeDetector } from "./customCodeDetector";
 import { ExistingRuleBasedCodeDetector } from "./existingRuleBasedCodeDetector";
 import { SourceComment } from "./sourceComment";
@@ -38,13 +39,13 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
         // });
         mergedComments.forEach((commentGroup) => {
             const classificationResult = classifier.classify(commentGroup);
-            classificationResult.classifications.forEach( (classification) => {
-                if (classification.commentClass === CommentClass.Code ||
-                        classification.commentClass === CommentClass.Copyright) {
-                    const comment = classificationResult.comment.getSanitizedCommentLines()[classification.line];
+            classificationResult.annotations.forEach( (annotation) => {
+                if (annotation.commentClass === CommentClass.Code ||
+                        annotation.commentClass === CommentClass.Copyright) {
+                    const comment = classificationResult.comment.getSanitizedCommentLines()[annotation.line];
                     const pos = comment.pos;
                     const end = comment.end;
-                    this.addFailure(pos, end, classification.note);
+                    this.addFailure(pos, end, annotation.note);
                 }
             });
 
