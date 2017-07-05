@@ -20,3 +20,7 @@ export interface ICommentClassification {
     comment: SourceComment;
     annotations: ICommentAnnotation[];
 }
+
+export interface ICommentAnnotator {
+    getAnnotations(comment: SourceComment): ICommentAnnotation[];
+}

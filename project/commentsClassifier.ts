@@ -31,21 +31,18 @@ export class CommentsClassifier {
             annotations: [],
             comment,
         };
-        let classificationResult = this.isLicense(comment);
-        if (classificationResult.matchesClass) {
-            result.annotations.push({
-                commentClass: CommentClass.Copyright,
-                line: 0,
-                note: classificationResult.description,
-            });
-        }
+        const matcher = new LicenseMatcher();
+        // Should also take position inside the file into account, i.e., most licenses
+        // are at the beginning of a file and not somewhere in the middle.
+        const annotations = matcher.getAnnotations(comment);
+        result.annotations = result.annotations.concat(annotations);
         sanitizedLines.forEach( (line, index) => {
             const annotation = {
                 commentClass: CommentClass.Unknown,
                 line: index,
                 note: undefined,
             };
-            classificationResult = this.isCommentedCode(line.text);
+            const classificationResult = this.isCommentedCode(line.text);
             if (classificationResult.matchesClass) {
                 annotation.commentClass = CommentClass.Code;
                 annotation.note = classificationResult.description;
@@ -55,13 +52,6 @@ export class CommentsClassifier {
             }
         });
         return result;
-    }
-
-    private isLicense(comment: SourceComment): IInternalClassificationResult {
-        const matcher = new LicenseMatcher();
-        // Should also take position inside the file into account, i.e., most licenses
-        // are at the beginning of a file and not somewhere in the middle.
-        return { matchesClass: matcher.isLicense(comment), description: "That's a license" };
     }
 
     private isCommentedCode(commentText: string): IInternalClassificationResult {
