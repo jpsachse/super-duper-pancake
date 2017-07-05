@@ -11,8 +11,8 @@ export enum CommentClass {
 }
 
 export interface ICommentAnnotation {
-    line: number;
     commentClass: CommentClass;
+    line: number;
     note: string;
 }
 

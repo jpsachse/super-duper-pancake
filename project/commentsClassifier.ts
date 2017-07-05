@@ -34,31 +34,11 @@ export class CommentsClassifier {
         const matcher = new LicenseMatcher();
         // Should also take position inside the file into account, i.e., most licenses
         // are at the beginning of a file and not somewhere in the middle.
-        const annotations = matcher.getAnnotations(comment);
+        let annotations = matcher.getAnnotations(comment);
         result.annotations = result.annotations.concat(annotations);
-        sanitizedLines.forEach( (line, index) => {
-            const annotation = {
-                commentClass: CommentClass.Unknown,
-                line: index,
-                note: undefined,
-            };
-            const classificationResult = this.isCommentedCode(line.text);
-            if (classificationResult.matchesClass) {
-                annotation.commentClass = CommentClass.Code;
-                annotation.note = classificationResult.description;
-            }
-            if (annotation.commentClass !== CommentClass.Unknown) {
-                result.annotations.push(annotation);
-            }
-        });
+        annotations = this.codeDetector.getAnnotations(comment);
+        result.annotations = result.annotations.concat(annotations);
         return result;
-    }
-
-    private isCommentedCode(commentText: string): IInternalClassificationResult {
-        if (this.codeDetector.isCommentedCode(commentText)) {
-            return {matchesClass: true, description: "Code should not be commented out"};
-        }
-        return {matchesClass: false, description: undefined};
     }
 
 }

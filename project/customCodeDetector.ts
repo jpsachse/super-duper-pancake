@@ -1,23 +1,29 @@
 import * as Lint from "tslint";
 import { CodeDetector } from "./codeDetector";
+import { CommentClass, ICommentAnnotation } from "./commentClassificationTypes";
+import { SourceComment } from "./sourceComment";
 
 export class CustomCodeDetector extends CodeDetector {
 
-    public isCommentedCode(text: string): boolean {
+    public getAnnotations(comment: SourceComment): ICommentAnnotation[] {
         const linter = this.setupLinter();
         const configuration = this.getLintConfiguration();
-        linter.lint("tmpFile", text, configuration);
-        const result = linter.getResult();
-        let containsCode = false;
-        let failureText;
-        result.failures.forEach((failure) => {
-            if (failure.getRuleName() === "no-code") {
-                containsCode = true;
-                failureText = failure.getFailure();
-                return;
+        const result: ICommentAnnotation[] = [];
+        comment.getSanitizedCommentLines().forEach((commentLine, index) => {
+            linter.lint("tmpFile", commentLine.text, configuration);
+            const lintResult = linter.getResult();
+            let containsCode = false;
+            lintResult.failures.forEach((failure) => {
+                if (failure.getRuleName() === "no-code") {
+                    containsCode = true;
+                    return;
+                }
+            });
+            if (containsCode) {
+                result.push(this.createAnnotation(index));
             }
         });
-        return containsCode;
+        return result;
     }
 
     private setupLinter(): Lint.Linter {

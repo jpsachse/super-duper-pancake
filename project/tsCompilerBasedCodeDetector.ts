@@ -1,10 +1,14 @@
 import * as ts from "typescript";
 import { CodeDetector } from "./codeDetector";
+import { CommentClass, ICommentAnnotation } from "./commentClassificationTypes";
+import { SourceComment } from "./sourceComment";
 
 export class TsCompilerBasedCodeDetector extends CodeDetector {
 
-// based on https://gist.github.com/teppeis/6e0f2d823a94de4ae442
-    public  isCommentedCode(commentText: string): boolean {
+    // based on https://gist.github.com/teppeis/6e0f2d823a94de4ae442
+    public getAnnotations(comment: SourceComment): ICommentAnnotation[] {
+        const result: ICommentAnnotation[] = [];
+        let commentText: string;
         const compilerOptions: ts.CompilerOptions = {};
         // Create a compilerHost object to allow the compiler to read and write files
         const compilerHost = {
@@ -24,11 +28,17 @@ export class TsCompilerBasedCodeDetector extends CodeDetector {
             useCaseSensitiveFileNames: () => false,
             writeFile: (name, text, writeByteOrderMark) => { return; },
         };
-        const program = ts.createProgram(["file.ts"], compilerOptions, compilerHost);
-        const errors = program.getSyntacticDiagnostics();
-        // 0 is a very pessimistic approach and currently won't find anything that spans more than one line
-        // I have to strike a balance between trying to match every line separately and whole blocks
-        return errors.length === 0;
+        comment.getSanitizedCommentLines().forEach((commentLine, index) => {
+            commentText = commentLine.text;
+            const program = ts.createProgram(["file.ts"], compilerOptions, compilerHost);
+            const errors = program.getSyntacticDiagnostics();
+            // 0 is a very pessimistic approach and currently won't find anything that spans more than one line
+            // I have to strike a balance between trying to match every line separately and whole blocks
+            if (errors.length === 0) {
+                result.push(this.createAnnotation(index));
+            }
+        });
+        return result;
     }
 
 }
