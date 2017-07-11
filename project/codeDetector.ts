@@ -13,4 +13,13 @@ export abstract class CodeDetector implements ICommentAnnotator {
             note: this.NOTE_TEXT,
         };
     }
+
+    protected createAnnotations(startLine: number, endLine: number): ICommentAnnotation[] {
+        const result = [];
+        while (startLine < endLine) {
+            result.push(this.createAnnotation(startLine));
+            startLine++;
+        }
+        return result;
+    }
 }

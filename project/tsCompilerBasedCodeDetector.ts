@@ -7,7 +7,7 @@ export class TsCompilerBasedCodeDetector extends CodeDetector {
 
     // based on https://gist.github.com/teppeis/6e0f2d823a94de4ae442
     public getAnnotations(comment: SourceComment): ICommentAnnotation[] {
-        const result: ICommentAnnotation[] = [];
+        let result: ICommentAnnotation[] = [];
         let commentText: string;
         const compilerOptions: ts.CompilerOptions = {};
         // Create a compilerHost object to allow the compiler to read and write files
@@ -28,17 +28,43 @@ export class TsCompilerBasedCodeDetector extends CodeDetector {
             useCaseSensitiveFileNames: () => false,
             writeFile: (name, text, writeByteOrderMark) => { return; },
         };
-        comment.getSanitizedCommentLines().forEach((commentLine, index) => {
-            commentText = commentLine.text;
-            const program = ts.createProgram(["file.ts"], compilerOptions, compilerHost);
-            const errors = program.getSyntacticDiagnostics();
-            // 0 is a very pessimistic approach and currently won't find anything that spans more than one line
-            // I have to strike a balance between trying to match every line separately and whole blocks
-            if (errors.length === 0) {
-                result.push(this.createAnnotation(index));
+        const commentLines = comment.getSanitizedCommentLines();
+        // Try to compile the whole comment first and see if it works.
+        commentText = comment.getSanitizedCommentText().text;
+        let errors = this.getSyntacticErrors(compilerOptions, compilerHost);
+        if (errors.length === 0) {
+            return this.createAnnotations(0, commentLines.length - 1);
+        }
+        // If the compilation did not work for the whole comment text, try it again with
+        // all available subsets of continuous lines.
+        let start = 1;
+        let end = commentLines.length - 1;
+        while (start < commentLines.length) {
+            while (start <= end) {
+                // TODO: don't include leading/trailing empty lines
+                commentText = commentLines.slice(start, end + 1).map((line) => line.text).join("\n");
+                commentText = commentText.replace(/^\s+|\s+$/g, "");
+                if (commentText.length > 0) {
+                    errors = this.getSyntacticErrors(compilerOptions, compilerHost);
+                    if (errors.length === 0) {
+                        result = result.concat(this.createAnnotations(start, end));
+                        errors = [];
+                        start = end;
+                        break;
+                    }
+                }
+                end--;
             }
-        });
+            start++;
+            end = commentLines.length;
+        }
         return result;
+    }
+
+    private getSyntacticErrors(compilerOptions: ts.CompilerOptions,
+                               compilerHost: ts.CompilerHost): ts.Diagnostic[] {
+        const program = ts.createProgram(["file.ts"], compilerOptions, compilerHost);
+        return program.getSyntacticDiagnostics();
     }
 
 }

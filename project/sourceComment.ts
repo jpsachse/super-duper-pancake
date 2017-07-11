@@ -74,7 +74,10 @@ export class SourceComment implements TextRange {
     }
 
     private stripCommentStartTokens(text: string): string {
-        const re = /^(\s*((\/\/+)|(\/\*+)|(\**)))*|((\*\/))/mg;
+        // TODO: replace the regex based solution with a more stable one that manually traverses
+        // the string, like the commentWriter of ts does in order to handle edge cases like
+        // multiline comments starting on the end of one line or multiple trailing single line comments.
+        const re = /^(\s*(\/\/+|\/\*+|\*\/)\s*)+/mg;
         return text.replace(re, "");
     }
 
