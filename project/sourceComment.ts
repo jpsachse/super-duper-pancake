@@ -1,3 +1,4 @@
+import { TextRange } from "typescript";
 
 export interface ICommentPart {
     pos: number;
@@ -5,7 +6,7 @@ export interface ICommentPart {
     text: string;
 }
 
-export class SourceComment {
+export class SourceComment implements TextRange {
 
     private commentParts: ICommentPart[] = [];
 
@@ -62,6 +63,14 @@ export class SourceComment {
 
     public getCommentParts(): ICommentPart[] {
         return this.commentParts;
+    }
+
+    get pos(): number {
+        return this.commentParts[0].pos;
+    }
+
+    get end(): number {
+        return this.commentParts[this.commentParts.length - 1].end;
     }
 
     private stripCommentStartTokens(text: string): string {
