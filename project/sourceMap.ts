@@ -1,5 +1,5 @@
 import { DataInterval, IntervalTree } from "node-interval-tree";
-import * as Utils from "tsutils";
+import * as TSUtils from "tsutils";
 import * as ts from "typescript";
 import { SourceComment } from "./sourceComment";
 
@@ -77,7 +77,7 @@ export class SourceMap {
         const sourceLines = sourceFile.getFullText().replace(/\r\n/g, "/n").split("/n");
         let previousCommentEndLine = -1;
         let currentCommentStartLine = 0;
-        Utils.forEachComment(sourceFile, (fullText, {kind, pos, end}) => {
+        TSUtils.forEachComment(sourceFile, (fullText, {kind, pos, end}) => {
             currentCommentStartLine = ts.getLineAndCharacterOfPosition(sourceFile, pos).line;
             if (previousCommentEndLine === -1 || currentCommentStartLine > previousCommentEndLine + 1) {
                 result.push(new SourceComment(pos, end, fullText.substring(pos, end)));

@@ -1,5 +1,4 @@
 import * as Lint from "tslint";
-import * as utils from "tsutils";
 import * as ts from "typescript";
 import { CodeDetector } from "./codeDetector";
 import { CommentClass, ICommentAnnotation, ICommentClassification } from "./commentClassificationTypes";

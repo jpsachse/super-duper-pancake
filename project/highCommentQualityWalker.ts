@@ -1,5 +1,4 @@
 import * as Lint from "tslint";
-import * as Utils from "tsutils";
 import * as ts from "typescript";
 import { CommentClass } from "./commentClassificationTypes";
 import { CommentsClassifier } from "./commentsClassifier";
