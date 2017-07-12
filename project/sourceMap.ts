@@ -16,7 +16,7 @@ export class SourceMap {
         const addNodeToMap = (nodeOrComment: SourcePart) => {
             if (this.isNode(nodeOrComment)) {
                 this.nodeLocations.insert({
-                    low: nodeOrComment.pos,
+                    low: (nodeOrComment as ts.Node).getStart(sourceFile) || nodeOrComment.pos,
                     high: nodeOrComment.end,
                     data: nodeOrComment,
                 });
@@ -29,10 +29,10 @@ export class SourceMap {
                 this.nodesOfLine.get(line).push(nodeOrComment);
             }
             if (this.isNode(nodeOrComment)) {
-                nodeOrComment.forEachChild(addNodeToMap);
+                nodeOrComment.getChildren().forEach(addNodeToMap);
             }
         };
-        sourceFile.forEachChild(addNodeToMap);
+        sourceFile.getChildren().forEach(addNodeToMap);
         this.mergedComments = this.mergeAllComments(sourceFile);
         this.mergedComments.forEach(addNodeToMap);
     }
@@ -58,15 +58,10 @@ export class SourceMap {
         return this.getNodeFollowing(nodes[0]);
     }
 
-    public getParent(element: SourcePart): SourcePart | undefined {
-        if (this.isNode(element)) {
-            return element.parent;
-        }
-        const enclosingNodes = this.nodeLocations.search(element.pos, element.end);
-        if (enclosingNodes.length === 0) {
-            return;
-        }
-        return enclosingNodes[0].data;
+    public getEnclosingNodes(element: SourcePart): ts.Node[] {
+        const enclosingNodeIntervals = this.nodeLocations.search(element.pos, element.end);
+        const enclosingNodes = enclosingNodeIntervals.map((dataInterval) => dataInterval.data);
+        return enclosingNodes.filter((sourcePart) => this.isNode(sourcePart)) as ts.Node[];
     }
 
     public getAllComments(): SourceComment[] {
