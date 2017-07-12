@@ -8,11 +8,11 @@ export type SourcePart = ts.Node | SourceComment;
 export class SourceMap {
 
     private nodesOfLine = new Map<number, SourcePart[]>();
-    private lineOfNode = new Map<SourcePart, number>();
+    private positionOfNode = new Map<SourcePart, ts.TextRange>();
     private nodeLocations = new IntervalTree<DataInterval<SourcePart>>();
     private mergedComments: SourceComment[];
 
-    constructor(sourceFile: ts.SourceFile) {
+    constructor(private sourceFile: ts.SourceFile) {
         const addNodeToMap = (nodeOrComment: SourcePart) => {
             if (this.isNode(nodeOrComment)) {
                 this.nodeLocations.insert({
@@ -21,12 +21,15 @@ export class SourceMap {
                     data: nodeOrComment,
                 });
             }
+            this.positionOfNode.set(nodeOrComment, {pos: nodeOrComment.pos, end: nodeOrComment.end});
             const line = sourceFile.getLineAndCharacterOfPosition(nodeOrComment.pos).line;
-            this.lineOfNode.set(nodeOrComment, line);
             if (!this.nodesOfLine.has(line)) {
                 this.nodesOfLine.set(line, [nodeOrComment]);
             } else {
                 this.nodesOfLine.get(line).push(nodeOrComment);
+            }
+            if (this.isNode(nodeOrComment)) {
+                nodeOrComment.forEachChild(addNodeToMap);
             }
         };
         sourceFile.forEachChild(addNodeToMap);
@@ -34,19 +37,22 @@ export class SourceMap {
         this.mergedComments.forEach(addNodeToMap);
     }
 
-    public getNodeFollowing(node: SourcePart): SourcePart | undefined {
-        const line = this.lineOfNode.get(node);
-        if (!line) { return; }
-        const linesWithCode = Array.from(this.nodesOfLine.keys());
-        const index = linesWithCode.indexOf(line);
-        if (!index || index + 1 >= linesWithCode.length) { return; }
-        const nextLine = linesWithCode[index + 1];
+    public getNodeFollowing(node: SourcePart): ts.Node | undefined {
+        const position = this.positionOfNode.get(node);
+        if (!position) { return; }
+        const endingLine = this.sourceFile.getLineAndCharacterOfPosition(position.end).line;
+        const followingNodes = this.nodesOfLine.get(endingLine + 1);
+        if (!followingNodes) { return; }
         // As creation of this list is done by iterating the AST, starting at parent nodes,
         // the outermost node of the line is the one containing all other calls.
-        return this.nodesOfLine.get(nextLine)[0];
+        const nextElement = followingNodes[0];
+        if (this.isNode(nextElement)) {
+            return nextElement;
+        }
+        return;
     }
 
-    public getNodeAfterLine(line: number): SourcePart | undefined {
+    public getNodeAfterLine(line: number): ts.Node | undefined {
         const nodes = this.nodesOfLine[line];
         if (!nodes || nodes.length === 0) { return; }
         return this.getNodeFollowing(nodes[0]);

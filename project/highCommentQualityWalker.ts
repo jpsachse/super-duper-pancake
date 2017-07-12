@@ -26,7 +26,7 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
         // const ruleDirectory = "./node_modules/tslint/lib/rules";
         // const codeDetector = new ExistingRuleBasedCodeDetector(ruleDirectory);
         const codeDetector = new TsCompilerBasedCodeDetector();
-        const classifier = new CommentsClassifier(codeDetector);
+        const classifier = new CommentsClassifier(codeDetector, sourceMap);
         // Utils.forEachComment(sourceFile, (fullText, range) => {
         //     const text = fullText.substring(range.pos, range.end);
         //     const classificationResult = classifier.classify(new SourceComment(range.pos, range.end, text));
@@ -42,13 +42,13 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
             const parent = sourceMap.getParent(commentGroup);
             const classificationResult = classifier.classify(commentGroup);
             classificationResult.annotations.forEach( (annotation) => {
-                if (annotation.commentClass === CommentClass.Code ||
-                        annotation.commentClass === CommentClass.Copyright) {
+                // if (annotation.commentClass === CommentClass.Code ||
+                //         annotation.commentClass === CommentClass.Copyright) {
                     const comment = classificationResult.comment.getSanitizedCommentLines()[annotation.line];
                     const pos = comment.pos;
                     const end = comment.end;
                     this.addFailure(pos, end, annotation.note);
-                }
+                // }
             });
 
             // const text = commentGroup.comments.join("/n");
