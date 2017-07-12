@@ -33,7 +33,7 @@ export class TsCompilerBasedCodeDetector extends CodeDetector {
         commentText = comment.getSanitizedCommentText().text;
         let errors = this.getSyntacticErrors(compilerOptions, compilerHost);
         if (errors.length === 0) {
-            return this.createAnnotations(0, commentLines.length - 1);
+            return this.createAnnotations(0, commentLines.length);
         }
         // If the compilation did not work for the whole comment text, try it again with
         // all available subsets of continuous lines.
