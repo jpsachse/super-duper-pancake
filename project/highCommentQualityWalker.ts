@@ -17,6 +17,7 @@ interface ICommentGroup {
 export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
 
     public walk(sourceFile: ts.SourceFile) {
+        this.printAllChildren(sourceFile);
         const sourceMap = new SourceMap(sourceFile);
         // Hey, there is a comment!
         // TODO: use this.options() instead of hardcoded string
@@ -58,4 +59,9 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
             // }
         });
     }
+    private printAllChildren(node: ts.Node, depth: number = 0) {
+        console.log("--".repeat(depth), ts.SyntaxKind[node.kind], node.getStart(), node.end);
+        node.getChildren().forEach( (child) => this.printAllChildren(child, depth + 1));
+    }
+
 }
