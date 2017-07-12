@@ -1,12 +1,12 @@
 import * as Lint from "tslint";
 import * as ts from "typescript";
-import { CommentClass } from "./commentClassificationTypes";
+import { CommentClass, ICommentAnnotation, ICommentClassification } from "./commentClassificationTypes";
 import { CommentsClassifier } from "./commentsClassifier";
 import { CustomCodeDetector } from "./customCodeDetector";
 import { ExistingRuleBasedCodeDetector } from "./existingRuleBasedCodeDetector";
 import { SourceComment } from "./sourceComment";
-import { TsCompilerBasedCodeDetector } from "./tsCompilerBasedCodeDetector";
 import { SourceMap } from "./sourceMap";
+import { TsCompilerBasedCodeDetector } from "./tsCompilerBasedCodeDetector";
 
 interface ICommentGroup {
     pos: number;
@@ -39,16 +39,26 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
         //     });
         // });
         sourceMap.getAllComments().forEach((commentGroup) => {
-            const parent = sourceMap.getParent(commentGroup);
             const classificationResult = classifier.classify(commentGroup);
             classificationResult.annotations.forEach( (annotation) => {
-                // if (annotation.commentClass === CommentClass.Code ||
-                //         annotation.commentClass === CommentClass.Copyright) {
-                    const comment = classificationResult.comment.getSanitizedCommentLines()[annotation.line];
-                    const pos = comment.pos;
-                    const end = comment.end;
-                    this.addFailure(pos, end, annotation.note);
-                // }
+                switch (annotation.commentClass) {
+                    case CommentClass.Code: {
+                        this.addFailureForClassification(classificationResult, annotation);
+                        break;
+                    }
+                    case CommentClass.Copyright:
+                    case CommentClass.Header:
+                        // Now do something amazing with this information, e.g., decide whether this
+                        // is a good or bad comment.
+                    case CommentClass.Inline:
+                        // Now do something amazing with this information, e.g., decide whether this
+                        // is a good or bad comment.
+                    case CommentClass.Section:
+                    case CommentClass.Task:
+                    case CommentClass.Unknown:
+                    default:
+                        break;
+                }
             });
 
             // const text = commentGroup.comments.join("/n");
@@ -59,6 +69,14 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
             // }
         });
     }
+
+    private addFailureForClassification(classificationResult: ICommentClassification, annotation: ICommentAnnotation) {
+        const comment = classificationResult.comment.getSanitizedCommentLines()[annotation.line];
+        const pos = comment.pos;
+        const end = comment.end;
+        this.addFailure(pos, end, annotation.note);
+    }
+
     private printAllChildren(node: ts.Node, depth: number = 0) {
         console.log("--".repeat(depth), ts.SyntaxKind[node.kind], node.getStart(), node.end);
         node.getChildren().forEach( (child) => this.printAllChildren(child, depth + 1));
