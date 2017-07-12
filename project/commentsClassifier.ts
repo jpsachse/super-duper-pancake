@@ -28,7 +28,6 @@ export class CommentsClassifier {
     constructor(private codeDetector: CodeDetector, private sourceMap: SourceMap) {
     }
 
-    // Test This
     public classify(comment: SourceComment): ICommentClassification {
         const commentText = comment.getSanitizedCommentText().text;
         const sanitizedLines = comment.getSanitizedCommentLines();
@@ -38,31 +37,11 @@ export class CommentsClassifier {
         };
         const nextNode = this.sourceMap.getNodeFollowing(comment);
         if (nextNode) {
-            switch (nextNode.kind) {
-                case SK.Identifier: {
-                    const siblings = nextNode.parent.getChildren();
-                    const index = siblings.indexOf(nextNode);
-                    if (index <= 0) { break; }
-                    const previousSibling = siblings[index - 1];
-                    if (previousSibling.kind === SK.FunctionKeyword) {
-                        const headerAnnotations = this.createAnnotationsForEnireComment(comment,
-                                                                                        CommentClass.Header,
-                                                                                        "That's a function header");
-                        result.annotations.push(...headerAnnotations);
-                    }
-                    break;
-                }
-                case SK.FunctionDeclaration:
-                case SK.FunctionExpression:
-                case SK.FunctionKeyword:
-                case SK.FunctionType: {
-                    const headerAnnotations = this.createAnnotationsForEnireComment(comment,
-                                                                                    CommentClass.Header,
-                                                                                    "That's a function header");
-                    break;
-                }
-                default:
-                    break;
+            if (this.isSomeKindOfFunction(nextNode) || this.isSomeKindOfFunction(nextNode.parent)) {
+                const headerAnnotations = this.createAnnotationsForEnireComment(comment,
+                                                                                CommentClass.Header,
+                                                                                "That's a function header");
+                result.annotations.push(...headerAnnotations);
             }
         }
         const matcher = new LicenseMatcher();
@@ -73,6 +52,12 @@ export class CommentsClassifier {
         annotations = this.codeDetector.getAnnotations(comment);
         result.annotations.push(...annotations);
         return result;
+    }
+
+    private isSomeKindOfFunction(node: ts.Node): boolean {
+        return ts.isMethodDeclaration(node) ||
+                ts.isFunctionDeclaration(node) ||
+                ts.isConstructorDeclaration(node);
     }
 
     private createAnnotationsForEnireComment(comment: SourceComment,
