@@ -7,6 +7,7 @@ import { CustomCodeDetector } from "./customCodeDetector";
 import { ExistingRuleBasedCodeDetector } from "./existingRuleBasedCodeDetector";
 import { SourceComment } from "./sourceComment";
 import { TsCompilerBasedCodeDetector } from "./tsCompilerBasedCodeDetector";
+import { SourceMap } from "./sourceMap";
 
 interface ICommentGroup {
     pos: number;
@@ -17,6 +18,7 @@ interface ICommentGroup {
 export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
 
     public walk(sourceFile: ts.SourceFile) {
+        const sourceMap = new SourceMap(sourceFile);
         // Hey, there is a comment!
         // TODO: use this.options() instead of hardcoded string
         // Also: provide an option to choose from different code detection methods
@@ -25,7 +27,6 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
         // const codeDetector = new ExistingRuleBasedCodeDetector(ruleDirectory);
         const codeDetector = new TsCompilerBasedCodeDetector();
         const classifier = new CommentsClassifier(codeDetector);
-        const mergedComments = this.getMergedComments(sourceFile);
         // Utils.forEachComment(sourceFile, (fullText, range) => {
         //     const text = fullText.substring(range.pos, range.end);
         //     const classificationResult = classifier.classify(new SourceComment(range.pos, range.end, text));
@@ -37,7 +38,8 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
         //         }
         //     });
         // });
-        mergedComments.forEach((commentGroup) => {
+        sourceMap.getAllComments().forEach((commentGroup) => {
+            const parent = sourceMap.getParent(commentGroup);
             const classificationResult = classifier.classify(commentGroup);
             classificationResult.annotations.forEach( (annotation) => {
                 if (annotation.commentClass === CommentClass.Code ||
@@ -56,22 +58,5 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
             //     this.addFailure(commentGroup.pos, commentGroup.end, failureText);
             // }
         });
-    }
-
-    private getMergedComments(sourceFile: ts.SourceFile): SourceComment[] {
-        const result: SourceComment[] = [];
-        const sourceLines = sourceFile.getFullText().replace(/\r\n/g, "/n").split("/n");
-        let previousCommentEndLine = -1;
-        let currentCommentStartLine = 0;
-        Utils.forEachComment(sourceFile, (fullText, {kind, pos, end}) => {
-            currentCommentStartLine = ts.getLineAndCharacterOfPosition(sourceFile, pos).line;
-            if (previousCommentEndLine === -1 || currentCommentStartLine > previousCommentEndLine + 1) {
-                result.push(new SourceComment(pos, end, fullText.substring(pos, end)));
-            } else if (currentCommentStartLine === previousCommentEndLine + 1) {
-                result[result.length - 1].addPart(pos, end, fullText.substring(pos, end));
-            }
-            previousCommentEndLine = ts.getLineAndCharacterOfPosition(sourceFile, end).line;
-        });
-        return result;
     }
 }

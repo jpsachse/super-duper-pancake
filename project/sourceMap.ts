@@ -10,6 +10,7 @@ export class SourceMap {
     private nodesOfLine = new Map<number, SourcePart[]>();
     private lineOfNode = new Map<SourcePart, number>();
     private nodeLocations = new IntervalTree<DataInterval<SourcePart>>();
+    private mergedComments: SourceComment[];
 
     constructor(sourceFile: ts.SourceFile) {
         const addNodeToMap = (nodeOrComment: SourcePart) => {
@@ -29,8 +30,8 @@ export class SourceMap {
             }
         };
         sourceFile.forEachChild(addNodeToMap);
-        const mergedComments = this.getMergedComments(sourceFile);
-        mergedComments.forEach(addNodeToMap);
+        this.mergedComments = this.mergeAllComments(sourceFile);
+        this.mergedComments.forEach(addNodeToMap);
     }
 
     public getNodeFollowing(node: SourcePart): SourcePart | undefined {
@@ -62,11 +63,15 @@ export class SourceMap {
         return enclosingNodes[0].data;
     }
 
+    public getAllComments(): SourceComment[] {
+        return this.mergedComments;
+    }
+
     private isNode(element: SourcePart): element is ts.Node {
         return (element as ts.Node).kind !== undefined;
     }
 
-    private getMergedComments(sourceFile: ts.SourceFile): SourceComment[] {
+    private mergeAllComments(sourceFile: ts.SourceFile): SourceComment[] {
         const result: SourceComment[] = [];
         const sourceLines = sourceFile.getFullText().replace(/\r\n/g, "/n").split("/n");
         let previousCommentEndLine = -1;
