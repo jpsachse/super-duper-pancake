@@ -1,3 +1,9 @@
+function test() {
+    // This function is incrementing aVariable from 5 to 6
+    let aVariable = 5;
+    aVariable++;
+}
+
 // This is a test file including a lot of different comments, including license texts, which are
 // just included for testing and not actually for licensing.
 
@@ -27,16 +33,6 @@
 // Does this get recognized as code as well?
 
 // "This is only one piece of comment, isn't it?"
-
-// It's as simple as that
-// Its as simple as that
-// stuff as test
-/* Some more comment text.
-    Even with code in another line:
-    const something = 6;
-*/
-// Does this get recognized as code as well?
-// console.log(mergedComments);
 
 /* finally some multiline code:
 while (true) {
