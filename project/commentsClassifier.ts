@@ -38,10 +38,18 @@ export class CommentsClassifier {
         const nextNode = this.sourceMap.getNodeFollowing(comment);
         if (nextNode) {
             if (this.isSomeKindOfFunction(nextNode) || this.isSomeKindOfFunction(nextNode.parent)) {
-                const headerAnnotations = this.createAnnotationsForEnireComment(comment,
-                                                                                CommentClass.Header,
-                                                                                "That's a function header");
+                const headerAnnotations = this.createAnnotations(comment,
+                                                                 CommentClass.Header,
+                                                                 "That's a function header");
                 result.annotations.push(...headerAnnotations);
+            }
+        }
+        const enclosingNodes = this.sourceMap.getEnclosingNodes(comment);
+        for (const parentNode of enclosingNodes) {
+            if (parentNode && this.isSomeKindOfFunction(parentNode)) {
+                const inlineAnnotations = this.createAnnotations(comment, CommentClass.Inline, "Some inline comment");
+                result.annotations.push(...inlineAnnotations);
+                break;
             }
         }
         const matcher = new LicenseMatcher();
@@ -60,9 +68,9 @@ export class CommentsClassifier {
                 ts.isConstructorDeclaration(node);
     }
 
-    private createAnnotationsForEnireComment(comment: SourceComment,
-                                             commentClass: CommentClass,
-                                             note: string): ICommentAnnotation[] {
+    private createAnnotations(comment: SourceComment,
+                              commentClass: CommentClass,
+                              note: string): ICommentAnnotation[] {
         const result: ICommentAnnotation[] = [];
         const numberOfLines = comment.getSanitizedCommentLines().length;
         for (let line = 0; line < numberOfLines; ++line) {
