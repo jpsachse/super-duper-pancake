@@ -64,7 +64,15 @@ export class TsCompilerBasedCodeDetector extends CodeDetector {
     private getSyntacticErrors(compilerOptions: ts.CompilerOptions,
                                compilerHost: ts.CompilerHost): ts.Diagnostic[] {
         const program = ts.createProgram(["file.ts"], compilerOptions, compilerHost);
-        return program.getSyntacticDiagnostics();
+        const onlyErrors = (diagnostic) => diagnostic.category === ts.DiagnosticCategory.Error;
+        const missingBracket = /^\'\}|\)\' expected/;
+        const withoutMissingClosingBrackets = (diagnostic: ts.Diagnostic) => {
+            if (typeof diagnostic.messageText === "string") {
+                return diagnostic.messageText.toString().search(missingBracket) === -1;
+            }
+            return true;
+        };
+        return program.getSyntacticDiagnostics().filter(onlyErrors).filter(withoutMissingClosingBrackets);
     }
 
 }
