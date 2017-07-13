@@ -74,11 +74,46 @@ export class SourceComment implements TextRange {
     }
 
     private stripCommentStartTokens(text: string): string {
-        // TODO: replace the regex based solution with a more stable one that manually traverses
-        // the string, like the commentWriter of ts does in order to handle edge cases like
-        // multiline comments starting on the end of one line or multiple trailing single line comments.
-        const re = /^(\s*(\/\/+|\/\*+|\*\/)\s*)+/mg;
-        return text.replace(re, "");
+        const lines = text.split("\n");
+        const result = [];
+        let isMultiLineComment = false;
+        lines.forEach((line) => {
+            if (isMultiLineComment) {
+                // Multiline comment end
+                const position = line.search(/\*\//);
+                if (position >= 0) {
+                    result.push(line.substring(0, position) + line.substring(position + 2));
+                    isMultiLineComment = false;
+                    return;
+                }
+                // Asterisks from JSDoc-styled comments
+                const leadingAsterisk = /^\s*\*+/;
+                const matchedAsterisks = line.match(leadingAsterisk);
+                if (matchedAsterisks && matchedAsterisks.length) {
+                    result.push(line.substring(matchedAsterisks[0].length));
+                    return;
+                }
+                result.push(line);
+                return;
+            }
+            // Multiline comment start
+            const multilineCommentstart = /^\s*\/\*+/;
+            let matchedCommentStarts = line.match(multilineCommentstart);
+            if (matchedCommentStarts && matchedCommentStarts.length) {
+                result.push(line.substring(matchedCommentStarts[0].length));
+                isMultiLineComment = true;
+                return;
+            }
+            // Single line comment start
+            const singleLineCommentStart = /^\/\/+/;
+            matchedCommentStarts = line.match(singleLineCommentStart);
+            if (matchedCommentStarts && matchedCommentStarts.length) {
+                result.push(line.substring(matchedCommentStarts[0].length));
+                return;
+            }
+            result.push(line);
+        });
+        return result.join("\n");
     }
 
 }
