@@ -85,7 +85,7 @@ export class SourceMap {
                 result[result.length - 1].addPart(pos, end, fullText.substring(pos, end));
             }
             previousCommentEndLine = ts.getLineAndCharacterOfPosition(sourceFile, end).line;
-        });
+        }, sourceFile);
         return result;
     }
 
