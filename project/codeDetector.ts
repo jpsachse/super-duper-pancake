@@ -16,7 +16,7 @@ export abstract class CodeDetector implements ICommentAnnotator {
 
     protected createAnnotations(startLine: number, endLine: number): ICommentAnnotation[] {
         const result = [];
-        while (startLine < endLine) {
+        while (startLine <= endLine) {
             result.push(this.createAnnotation(startLine));
             startLine++;
         }

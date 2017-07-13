@@ -29,15 +29,8 @@ export class TsCompilerBasedCodeDetector extends CodeDetector {
             writeFile: (name, text, writeByteOrderMark) => { return; },
         };
         const commentLines = comment.getSanitizedCommentLines();
-        // Try to compile the whole comment first and see if it works.
-        commentText = comment.getSanitizedCommentText().text;
-        let errors = this.getSyntacticErrors(compilerOptions, compilerHost);
-        if (errors.length === 0) {
-            return this.createAnnotations(0, commentLines.length);
-        }
-        // If the compilation did not work for the whole comment text, try it again with
-        // all available subsets of continuous lines.
-        let start = 1;
+        // Try compiling the comment text with available subsets of continuous lines.
+        let start = 0;
         let end = commentLines.length - 1;
         while (start < commentLines.length) {
             while (start <= end) {
@@ -45,10 +38,9 @@ export class TsCompilerBasedCodeDetector extends CodeDetector {
                 commentText = commentLines.slice(start, end + 1).map((line) => line.text).join("\n");
                 commentText = commentText.replace(/^\s+|\s+$/g, "");
                 if (commentText.length > 0) {
-                    errors = this.getSyntacticErrors(compilerOptions, compilerHost);
+                    const errors = this.getSyntacticErrors(compilerOptions, compilerHost);
                     if (errors.length === 0) {
-                        result = result.concat(this.createAnnotations(start, end));
-                        errors = [];
+                        result.push(...this.createAnnotations(start, end));
                         start = end;
                         break;
                     }
@@ -56,7 +48,7 @@ export class TsCompilerBasedCodeDetector extends CodeDetector {
                 end--;
             }
             start++;
-            end = commentLines.length;
+            end = commentLines.length - 1;
         }
         return result;
     }
