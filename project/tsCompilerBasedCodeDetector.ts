@@ -7,7 +7,7 @@ export class TsCompilerBasedCodeDetector extends CodeDetector {
 
     // based on https://gist.github.com/teppeis/6e0f2d823a94de4ae442
     public getAnnotations(comment: SourceComment): ICommentAnnotation[] {
-        let result: ICommentAnnotation[] = [];
+        const result: ICommentAnnotation[] = [];
         let commentText: string;
         const compilerOptions: ts.CompilerOptions = {};
         // Create a compilerHost object to allow the compiler to read and write files
