@@ -130,17 +130,23 @@ export class SourceMap {
 
     private mergeAllComments(sourceFile: ts.SourceFile): SourceComment[] {
         const result: SourceComment[] = [];
-        const sourceLines = sourceFile.getFullText().replace(/\r\n/g, "/n").split("/n");
+        const sourceLines = sourceFile.getFullText().replace(/\r\n/g, "\n").split("\n");
         let previousCommentEndLine = -1;
         let currentCommentStartLine = 0;
+        let previousLineWasTrailing = false;
         TSUtils.forEachComment(sourceFile, (fullText, {kind, pos, end}) => {
             currentCommentStartLine = ts.getLineAndCharacterOfPosition(sourceFile, pos).line;
-            if (previousCommentEndLine === -1 || currentCommentStartLine > previousCommentEndLine + 1) {
+            const commentOnlyLineRegxp = /^\s*(\/\/|\/\*)/gm;
+            const currentLineText = sourceLines[currentCommentStartLine];
+            const isTrailingComment = !currentLineText.match(commentOnlyLineRegxp);
+            if (previousLineWasTrailing || isTrailingComment ||
+                    previousCommentEndLine === -1 || currentCommentStartLine > previousCommentEndLine + 1) {
                 result.push(new SourceComment(pos, end, fullText.substring(pos, end)));
             } else if (currentCommentStartLine === previousCommentEndLine + 1) {
                 result[result.length - 1].addPart(pos, end, fullText.substring(pos, end));
             }
             previousCommentEndLine = ts.getLineAndCharacterOfPosition(sourceFile, end).line;
+            previousLineWasTrailing = isTrailingComment;
         }, sourceFile);
         return result;
     }
