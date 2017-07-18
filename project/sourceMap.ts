@@ -1,15 +1,9 @@
 import { DataInterval, IntervalTree } from "node-interval-tree";
 import * as TSUtils from "tsutils";
 import * as ts from "typescript";
+import { IMetricCollector, SourcePart } from "./commentClassificationTypes";
 import { SourceComment } from "./sourceComment";
-
-export type SourcePart = ts.Node | SourceComment;
-
-interface INodeMetrics {
-    node: ts.Node;
-    linesOfCode: number;
-    cyclomaticComplexity: number;
-}
+import Utils from "./utils";
 
 export class SourceMap {
 
@@ -17,33 +11,30 @@ export class SourceMap {
     private positionOfNode = new Map<SourcePart, ts.TextRange>();
     private nodeLocations = new IntervalTree<DataInterval<SourcePart>>();
     private mergedComments: SourceComment[];
-    private functionsAndMethods: INodeMetrics[] = [];
-    private nodeComplexities = new Map<ts.Node, number>();
 
-    constructor(private sourceFile: ts.SourceFile) {
+    constructor(private sourceFile: ts.SourceFile, collectors: IMetricCollector[]) {
         const addNodeToMap = (nodeOrComment: SourcePart) => {
-            if (this.isNode(nodeOrComment)) {
+            let partStart = nodeOrComment.pos;
+            if (Utils.isNode(nodeOrComment)) {
+                partStart = nodeOrComment.getStart(sourceFile);
+            }
+            const partEnd = nodeOrComment.end;
+            collectors.forEach((collector) => collector.visitNode(nodeOrComment));
+            if (Utils.isNode(nodeOrComment)) {
                 this.nodeLocations.insert({
-                    low: (nodeOrComment as ts.Node).getStart(sourceFile) || nodeOrComment.pos,
-                    high: nodeOrComment.end,
+                    low: partStart,
+                    high: partEnd,
                     data: nodeOrComment,
                 });
-                if (ts.isMethodDeclaration(nodeOrComment) || ts.isFunctionDeclaration(nodeOrComment)) {
-                    const linesOfCode = nodeOrComment.getText().split("\n").length;
-                    this.calculateCyclomaticComplexity(nodeOrComment);
-                    const cyclomaticComplexity = this.nodeComplexities.get(nodeOrComment);
-                    const metrics = {node: nodeOrComment, linesOfCode, cyclomaticComplexity};
-                    this.functionsAndMethods.push(metrics);
-                }
             }
-            this.positionOfNode.set(nodeOrComment, {pos: nodeOrComment.pos, end: nodeOrComment.end});
-            const line = sourceFile.getLineAndCharacterOfPosition(nodeOrComment.pos).line;
+            this.positionOfNode.set(nodeOrComment, {pos: partStart, end: partEnd});
+            const line = sourceFile.getLineAndCharacterOfPosition(partStart).line;
             if (!this.nodesOfLine.has(line)) {
                 this.nodesOfLine.set(line, [nodeOrComment]);
             } else {
                 this.nodesOfLine.get(line).push(nodeOrComment);
             }
-            if (this.isNode(nodeOrComment)) {
+            if (Utils.isNode(nodeOrComment)) {
                 nodeOrComment.getChildren().forEach(addNodeToMap);
             }
         };
@@ -61,10 +52,19 @@ export class SourceMap {
         // As creation of this list is done by iterating the AST, starting at parent nodes,
         // the outermost node of the line is the one containing all other calls.
         const nextElement = followingNodes[0];
-        if (this.isNode(nextElement)) {
+        if (Utils.isNode(nextElement)) {
             return nextElement;
         }
         return;
+    }
+
+    public getSourcePartBefore(node: SourcePart): SourcePart | undefined {
+        const position = this.positionOfNode.get(node);
+        if (!position) { return; }
+        const startLine = this.sourceFile.getLineAndCharacterOfPosition(position.pos).line;
+        const previousNodes = this.nodesOfLine.get(startLine - 1);
+        if (!previousNodes) { return; }
+        return previousNodes[previousNodes.length - 1];
     }
 
     public getNodeAfterLine(line: number): ts.Node | undefined {
@@ -76,56 +76,19 @@ export class SourceMap {
     public getEnclosingNodes(element: SourcePart): ts.Node[] {
         const enclosingNodeIntervals = this.nodeLocations.search(element.pos, element.end);
         const enclosingNodes = enclosingNodeIntervals.map((dataInterval) => dataInterval.data);
-        return enclosingNodes.filter((sourcePart) => this.isNode(sourcePart)) as ts.Node[];
+        return enclosingNodes.filter((sourcePart) => Utils.isNode(sourcePart)) as ts.Node[];
+    }
+
+    public getCommentsForNode(node: ts.Node): SourceComment[] {
+        const line = ts.getLineAndCharacterOfPosition(this.sourceFile, node.pos).line;
+        const leadingComments = this.nodesOfLine.get(line - 1).filter((part) => !Utils.isNode(part));
+        const trailingComments = this.nodesOfLine.get(line).filter((part) => !Utils.isNode(part));
+        leadingComments.push(...trailingComments);
+        return leadingComments as SourceComment[];
     }
 
     public getAllComments(): SourceComment[] {
         return this.mergedComments;
-    }
-
-    private isNode(element: SourcePart): element is ts.Node {
-        return (element as ts.Node).kind !== undefined;
-    }
-
-    // based on: https://github.com/palantir/tslint/blob/master/src/rules/cyclomaticComplexityRule.ts
-    private calculateCyclomaticComplexity(node: ts.Node) {
-        let complexity = 0;
-        const self = this;
-        const calculate = (child: ts.Node): void => {
-            const scopeBoundary = TSUtils.isScopeBoundary(child);
-            if (scopeBoundary === TSUtils.ScopeBoundary.Block || scopeBoundary === TSUtils.ScopeBoundary.Function) {
-                const old = complexity;
-                complexity = 1;
-                child.forEachChild(calculate);
-                self.nodeComplexities.set(child, complexity);
-                complexity = old;
-            } else {
-                if (self.isIncreasingCC(child)) {
-                    complexity++;
-                }
-                return child.forEachChild(calculate);
-            }
-        };
-        return calculate(node);
-    }
-
-    private isIncreasingCC(node: ts.Node): boolean {
-        if (node.kind === ts.SyntaxKind.CaseClause) {
-            return (node as ts.CaseClause).statements.length > 0;
-        }
-        if (node.kind === ts.SyntaxKind.BinaryExpression) {
-            const operatorKind = (node as ts.BinaryExpression).operatorToken.kind;
-            return operatorKind === ts.SyntaxKind.BarBarToken ||
-                    operatorKind === ts.SyntaxKind.AmpersandAmpersandToken;
-        }
-        return node.kind === ts.SyntaxKind.CatchClause ||
-            node.kind === ts.SyntaxKind.ConditionalExpression ||
-            node.kind === ts.SyntaxKind.DoStatement ||
-            node.kind === ts.SyntaxKind.ForStatement ||
-            node.kind === ts.SyntaxKind.ForInStatement ||
-            node.kind === ts.SyntaxKind.ForOfStatement ||
-            node.kind === ts.SyntaxKind.IfStatement ||
-            node.kind === ts.SyntaxKind.WhileStatement;
     }
 
     private mergeAllComments(sourceFile: ts.SourceFile): SourceComment[] {

@@ -1,5 +1,5 @@
 import * as ts from "typescript";
-import { CommentClass, ICommentAnnotation } from "./commentClassificationTypes";
+import { CommentClass, ICommentAnnotation, SourcePart } from "./commentClassificationTypes";
 import { SourceComment } from "./sourceComment";
 
 export default class Utils {
@@ -19,6 +19,10 @@ export default class Utils {
         return ts.isMethodDeclaration(node) ||
                 ts.isFunctionDeclaration(node) ||
                 ts.isConstructorDeclaration(node);
+    }
+
+    public static isNode(element: SourcePart): element is ts.Node {
+        return (element as ts.Node).kind !== undefined;
     }
 
 }

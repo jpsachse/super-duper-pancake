@@ -1,3 +1,4 @@
+import * as ts from "typescript";
 import { SourceComment } from "./sourceComment";
 
 export enum CommentClass {
@@ -9,6 +10,8 @@ export enum CommentClass {
     Task,
     Unknown,
 }
+
+export type SourcePart = ts.Node | SourceComment;
 
 export interface ICommentAnnotation {
     commentClass: CommentClass;
@@ -23,4 +26,8 @@ export interface ICommentClassification {
 
 export interface ICommentAnnotator {
     getAnnotations(comment: SourceComment): ICommentAnnotation[];
+}
+
+export interface IMetricCollector {
+    visitNode(node: SourcePart);
 }
