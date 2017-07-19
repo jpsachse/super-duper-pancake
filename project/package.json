@@ -11,7 +11,13 @@
     "typescript": "^2.3.3",
     "typescript.api": "^0.7.7"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "@types/chai": "^4.0.1",
+    "@types/mocha": "^2.2.41",
+    "chai": "^4.1.0",
+    "mocha": "^3.4.2",
+    "ts-node": "^3.2.0"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
