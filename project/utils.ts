@@ -1,17 +1,11 @@
 import * as ts from "typescript";
-import { CommentClass, ICommentAnnotation, SourcePart } from "./commentClassificationTypes";
-import { SourceComment } from "./sourceComment";
+import { SourcePart } from "./commentClassificationTypes";
+import { CommentClass, SourceComment } from "./sourceComment";
 
 export default class Utils {
 
-    public static createAnnotations(comment: SourceComment,
-                                    commentClass: CommentClass,
-                                    note: string): ICommentAnnotation[] {
-        const result: ICommentAnnotation[] = [];
-        comment.getSanitizedCommentLines().forEach((text, line) => {
-            result.push({commentClass, line, note});
-        });
-        return result;
+    public static createRange(start: number, end: number) {
+        return Array.from({length: end - start + 1}, (value, key) => key + start);
     }
 
     public static isSomeKindOfFunction(node: ts.Node): boolean {

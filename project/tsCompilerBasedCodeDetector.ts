@@ -1,13 +1,13 @@
 import * as ts from "typescript";
 import { CodeDetector } from "./codeDetector";
-import { CommentClass, ICommentAnnotation } from "./commentClassificationTypes";
-import { SourceComment } from "./sourceComment";
+import { CommentClass, SourceComment } from "./sourceComment";
+import Utils from "./utils";
 
 export class TsCompilerBasedCodeDetector extends CodeDetector {
 
     // based on https://gist.github.com/teppeis/6e0f2d823a94de4ae442
-    public getAnnotations(comment: SourceComment): ICommentAnnotation[] {
-        const result: ICommentAnnotation[] = [];
+    public annotate(comment: SourceComment) {
+        const lines: number[] = [];
         let commentText: string;
         const compilerOptions: ts.CompilerOptions = {};
         // Create a compilerHost object to allow the compiler to read and write files
@@ -34,13 +34,16 @@ export class TsCompilerBasedCodeDetector extends CodeDetector {
         let end = commentLines.length - 1;
         while (start < commentLines.length) {
             while (start <= end) {
-                // TODO: don't include leading/trailing empty lines
                 commentText = commentLines.slice(start, end + 1).map((line) => line.text).join("\n");
                 commentText = commentText.replace(/^\s+|\s+$/g, "");
                 if (commentText.length > 0) {
                     const errors = this.getSyntacticErrors(compilerOptions, compilerHost);
                     if (errors.length === 0) {
-                        result.push(...this.createAnnotations(start, end));
+                        if (start === 0 && end === commentLines.length - 1) {
+                            comment.classifications.push(this.classification);
+                            return;
+                        }
+                        lines.push(...Utils.createRange(start, end));
                         start = end;
                         break;
                     }
@@ -50,7 +53,10 @@ export class TsCompilerBasedCodeDetector extends CodeDetector {
             start++;
             end = commentLines.length - 1;
         }
-        return result;
+        if (lines.length > 0) {
+            this.classification.lines = lines;
+            comment.classifications.push(this.classification);
+        }
     }
 
     private getSyntacticErrors(compilerOptions: ts.CompilerOptions,

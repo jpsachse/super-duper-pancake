@@ -1,11 +1,10 @@
 import * as Lint from "tslint";
 import * as ts from "typescript";
-import { CommentClass, ICommentAnnotation, ICommentClassification } from "./commentClassificationTypes";
 import { CommentsClassifier } from "./commentsClassifier";
 import { CustomCodeDetector } from "./customCodeDetector";
 import { ExistingRuleBasedCodeDetector } from "./existingRuleBasedCodeDetector";
 import { CyclomaticComplexityCollector, LinesOfCodeCollector } from "./metricCollectors";
-import { SourceComment } from "./sourceComment";
+import { CommentClass, SourceComment } from "./sourceComment";
 import { SourceMap } from "./sourceMap";
 import { TsCompilerBasedCodeDetector } from "./tsCompilerBasedCodeDetector";
 
@@ -23,7 +22,6 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
         const locCollector = new LinesOfCodeCollector();
         const ccCollector = new CyclomaticComplexityCollector();
         const sourceMap = new SourceMap(sourceFile, [ccCollector, locCollector]);
-        // Hey, there is a comment!
         // TODO: use this.options() instead of hardcoded string
         // Also: provide an option to choose from different code detection methods
         // const codeDetector = new CustomCodeDetector("./comment-classification-rules/no-code")
@@ -33,12 +31,11 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
         const classifier = new CommentsClassifier(codeDetector, sourceMap);
 
         sourceMap.getAllComments().forEach((commentGroup) => {
-            const classificationResult = classifier.classify(commentGroup);
-            classificationResult.annotations.forEach( (annotation) => {
-                // this.addFailureForClassification(classificationResult, annotation);
-                switch (annotation.commentClass) {
+            classifier.classify(commentGroup);
+            commentGroup.classifications.forEach( (classification, index) => {
+                switch (classification.commentClass) {
                     case CommentClass.Code: {
-                        this.addFailureForClassification(classificationResult, annotation);
+                        this.addFailureForClassification(commentGroup, index);
                         break;
                     }
                     case CommentClass.Copyright:
@@ -63,11 +60,27 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
         });
     }
 
-    private addFailureForClassification(classificationResult: ICommentClassification, annotation: ICommentAnnotation) {
-        const comment = classificationResult.comment.getSanitizedCommentLines()[annotation.line];
-        const pos = comment.pos;
-        const end = comment.end;
-        this.addFailure(pos, end, annotation.note);
+    private addFailureForClassification(comment: SourceComment, classificationIndex: number) {
+        const classification = comment.classifications[classificationIndex];
+        const failureMessage = this.getFailureMessage(classification.commentClass);
+        if (classification.lines === undefined) {
+            const pos = comment.pos;
+            const end = comment.end;
+            this.addFailure(pos, end, failureMessage);
+        } else {
+            classification.lines.forEach( (lineNumber) => {
+                this.addFailure(comment.getPosOfLine(lineNumber),
+                                comment.getEndOfLine(lineNumber),
+                                failureMessage);
+            });
+        }
+    }
+
+    private getFailureMessage(commentClass: CommentClass): string | undefined {
+        switch (commentClass) {
+            case CommentClass.Code: return "Code should not be part of a comment!";
+            default: return;
+        }
     }
 
     private printGetChildrenForEach(node: ts.Node, depth: number = 0) {

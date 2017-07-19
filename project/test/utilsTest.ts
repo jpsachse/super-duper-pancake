@@ -1,8 +1,7 @@
 import { expect } from "chai";
 import "mocha";
 import * as ts from "typescript";
-import { CommentClass, ICommentAnnotation } from "../commentClassificationTypes";
-import { SourceComment } from "../sourceComment";
+import { CommentClass, SourceComment } from "../sourceComment";
 import Utils from "../utils";
 
 describe("is node", () => {
@@ -24,22 +23,9 @@ describe("is node", () => {
     });
 });
 
-describe("create Annotations", () => {
-    it("should create an annotation with the correct type for each line of a comment", () => {
-        const commentText = "This is the first part,\nwhich is even a multiline comment.";
-        const secondPart = "And here is a second part with only one line.";
-        const comment = new SourceComment(0, commentText.length, commentText);
-        comment.addPart(commentText.length + 1, commentText.length + secondPart.length + 1, secondPart);
-
-        const note = "This is a test note";
-        const commentClass = CommentClass.Inline;
-        const result = Utils.createAnnotations(comment, commentClass, note);
-        expect(result).to.have.lengthOf(3);
-        let line = 0;
-        result.forEach((annotation) => {
-            const expectedAnnotation: ICommentAnnotation = {commentClass, line, note};
-            expect(annotation).to.deep.equal(expectedAnnotation);
-            line++;
-        });
+describe("create range", () => {
+    it("should create an array containing all numbers between start and end (inclusive)", () => {
+        const range = Utils.createRange(3, 7);
+        expect(range).to.deep.equal([3, 4, 5, 6, 7]);
     });
 });

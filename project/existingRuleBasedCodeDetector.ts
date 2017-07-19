@@ -1,15 +1,15 @@
 import * as Lint from "tslint";
 import { CodeDetector } from "./codeDetector";
-import { CommentClass, ICommentAnnotation } from "./commentClassificationTypes";
-import { SourceComment } from "./sourceComment";
+import { CommentClass, ICommentClassification, SourceComment } from "./sourceComment";
 
 export class ExistingRuleBasedCodeDetector extends CodeDetector {
 
-    public getAnnotations(comment: SourceComment): ICommentAnnotation[] {
+    public annotate(comment: SourceComment) {
         const linter = this.setupLinter();
         const configuration = this.getLintConfiguration();
-        const result: ICommentAnnotation[] = [];
-        comment.getSanitizedCommentLines().forEach((commentLine, index) => {
+        const lines: number[] = [];
+        const commentLines = comment.getSanitizedCommentLines();
+        commentLines.forEach((commentLine, index) => {
             linter.lint("tmpFile", commentLine.text, configuration);
             const lintResult = linter.getResult();
             const numberOfTokens = commentLine.text.split(/\s/).length;
@@ -18,10 +18,14 @@ export class ExistingRuleBasedCodeDetector extends CodeDetector {
                 numberOfFailures += failure.getRuleName() === "no-unused-expression" ? 1 : 0;
             });
             if (numberOfFailures / numberOfTokens < 0.5) {
-                result.push(this.createAnnotation(index));
+                lines.push(index);
             }
         });
-        return result;
+        if (lines.length === 0) { return; }
+        if (lines.length < commentLines.length) {
+            this.classification.lines = lines;
+        }
+        comment.classifications.push(this.classification);
     }
 
     private setupLinter(): Lint.Linter {

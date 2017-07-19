@@ -1,13 +1,29 @@
 import { TextRange } from "typescript";
 
+export enum CommentClass {
+    Copyright,
+    Header,
+    Inline,
+    Section,
+    Code,
+    Task,
+    Unknown,
+}
+
 export interface ICommentPart {
     pos: number;
     end: number;
     text: string;
 }
 
+export interface ICommentClassification {
+    commentClass: CommentClass;
+    lines?: number[];
+}
+
 export class SourceComment implements TextRange {
 
+    public classifications: ICommentClassification[] = [];
     private commentParts: ICommentPart[] = [];
 
     constructor(pos: number, end: number, text: string) {
@@ -63,6 +79,14 @@ export class SourceComment implements TextRange {
 
     public getCommentParts(): ICommentPart[] {
         return this.commentParts;
+    }
+
+    public getPosOfLine(line: number): number {
+        return this.getSanitizedCommentLines()[line].pos;
+    }
+
+    public getEndOfLine(line: number): number {
+        return this.getSanitizedCommentLines()[line].end;
     }
 
     get pos(): number {
