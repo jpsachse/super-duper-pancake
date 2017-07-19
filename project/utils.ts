@@ -8,10 +8,9 @@ export default class Utils {
                                     commentClass: CommentClass,
                                     note: string): ICommentAnnotation[] {
         const result: ICommentAnnotation[] = [];
-        const numberOfLines = comment.getSanitizedCommentLines().length;
-        for (let line = 0; line < numberOfLines; ++line) {
+        comment.getSanitizedCommentLines().forEach((text, line) => {
             result.push({commentClass, line, note});
-        }
+        });
         return result;
     }
 

@@ -1,5 +1,6 @@
 import { CommentClass, ICommentAnnotation, ICommentAnnotator } from "./commentClassificationTypes";
 import { SourceComment } from "./sourceComment";
+import Utils from "./utils";
 
 /**
  * Matches licenses listed at https://choosealicense.com/appendix/
@@ -17,13 +18,8 @@ export class LicenseMatcher implements ICommentAnnotator {
                 generalMatches.length > 1);
         const result = [];
         if (isLicenseText) {
-            comment.getSanitizedCommentLines().forEach((commentLine, index) => {
-                result.push({
-                    commentClass: CommentClass.Copyright,
-                    line: index,
-                    note: "License detected",
-                });
-            });
+            const annotations = Utils.createAnnotations(comment, CommentClass.Copyright, "License");
+            result.push(...annotations);
         }
         return result;
     }
