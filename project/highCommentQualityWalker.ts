@@ -7,6 +7,7 @@ import { CyclomaticComplexityCollector, LinesOfCodeCollector } from "./metricCol
 import { CommentClass, SourceComment } from "./sourceComment";
 import { SourceMap } from "./sourceMap";
 import { TsCompilerBasedCodeDetector } from "./tsCompilerBasedCodeDetector";
+import Utils from "./utils";
 
 interface ICommentGroup {
     pos: number;
@@ -53,9 +54,29 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
                 }
             });
         });
-        ccCollector.getAllNodes().forEach((node) => {
-            if (ccCollector.getComplexity(node) > 10) {
-                this.addFailureAtNode(node, "This seems too complex");
+        sourceMap.getAllFunctionLikes().forEach((node) => {
+            if (ts.isFunctionLike(node) && ccCollector.getComplexity(node.body) > 10) {
+                const children: ts.Node[] = [];
+                const addChild = (child) => {
+                    if (ts.isBlock(child)) {
+                        children.push(child);
+                    }
+                    child.forEachChild(addChild);
+                };
+                node.forEachChild(addChild);
+                // Descending by complexity
+                children.sort((a, b) => {
+                    return ccCollector.getComplexity(b) - ccCollector.getComplexity(a);
+                });
+                // Add a failure at the parent node of the block with the highest complexity
+                children.forEach((child) => {
+                    const complexity = ccCollector.getComplexity(child);
+                    const comments = sourceMap.getCommentsForNode(child);
+                    if (comments.length === 0) {
+                        this.addFailureAtNode(child.parent, "CC: " + complexity);
+                    }
+                });
+                // this.addFailureAtNode(children[0].parent, "This seems too complex");
             }
         });
     }

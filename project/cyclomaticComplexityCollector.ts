@@ -27,7 +27,6 @@ export class CyclomaticComplexityCollector implements IMetricCollector {
         let complexity = 0;
         const self = this;
         const calculate = (child: ts.Node): void => {
-            // if (self.isSomeKindOfBlock(child)) {
             if (ts.isFunctionLike(child)) {
                 const old = complexity;
                 complexity = 1;
