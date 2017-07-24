@@ -11,28 +11,33 @@ export class SourceMap {
     private positionOfNode = new Map<SourcePart, ts.TextRange>();
     private nodeLocations = new IntervalTree<DataInterval<SourcePart>>();
     private mergedComments: SourceComment[];
+    private functionLikes: ts.FunctionLikeDeclaration[] = [];
 
     constructor(private sourceFile: ts.SourceFile, collectors: IMetricCollector[]) {
         const addNodeToMap = (nodeOrComment: SourcePart) => {
             let partStart = nodeOrComment.pos;
             if (Utils.isNode(nodeOrComment)) {
+                if (ts.isFunctionLike(nodeOrComment)) {
+                    this.functionLikes.push(nodeOrComment);
+                }
                 partStart = nodeOrComment.getStart(sourceFile);
             }
             const partEnd = nodeOrComment.end;
             collectors.forEach((collector) => collector.visitNode(nodeOrComment));
-            if (Utils.isNode(nodeOrComment)) {
-                this.nodeLocations.insert({
-                    low: partStart,
-                    high: partEnd,
-                    data: nodeOrComment,
-                });
-            }
+            this.nodeLocations.insert({
+                low: partStart,
+                high: partEnd,
+                data: nodeOrComment,
+            });
             this.positionOfNode.set(nodeOrComment, {pos: partStart, end: partEnd});
-            const line = sourceFile.getLineAndCharacterOfPosition(partStart).line;
-            if (!this.nodesOfLine.has(line)) {
-                this.nodesOfLine.set(line, [nodeOrComment]);
-            } else {
-                this.nodesOfLine.get(line).push(nodeOrComment);
+            const startLine = sourceFile.getLineAndCharacterOfPosition(partStart).line;
+            const endLine = sourceFile.getLineAndCharacterOfPosition(partEnd).line;
+            for (let line = startLine; line <= endLine; ++line) {
+                if (!this.nodesOfLine.has(line)) {
+                    this.nodesOfLine.set(line, [nodeOrComment]);
+                } else {
+                    this.nodesOfLine.get(line).push(nodeOrComment);
+                }
             }
             if (Utils.isNode(nodeOrComment)) {
                 nodeOrComment.getChildren().forEach(addNodeToMap);
@@ -41,6 +46,10 @@ export class SourceMap {
         sourceFile.getChildren().forEach(addNodeToMap);
         this.mergedComments = this.mergeAllComments(sourceFile);
         this.mergedComments.forEach(addNodeToMap);
+    }
+
+    public getAllFunctionLikes(): ts.FunctionLikeDeclaration[] {
+        return this.functionLikes;
     }
 
     public getNodeFollowing(node: SourcePart): ts.Node | undefined {
@@ -81,8 +90,10 @@ export class SourceMap {
 
     public getCommentsForNode(node: ts.Node): SourceComment[] {
         const line = ts.getLineAndCharacterOfPosition(this.sourceFile, node.pos).line;
-        const leadingComments = this.nodesOfLine.get(line - 1).filter((part) => !Utils.isNode(part));
-        const trailingComments = this.nodesOfLine.get(line).filter((part) => !Utils.isNode(part));
+        const leadingNodes = this.nodesOfLine.get(line - 1) || [];
+        const trailingNodes = this.nodesOfLine.get(line) || [];
+        const leadingComments = leadingNodes.filter((part) => !Utils.isNode(part));
+        const trailingComments = trailingNodes.filter((part) => !Utils.isNode(part));
         leadingComments.push(...trailingComments);
         return leadingComments as SourceComment[];
     }
