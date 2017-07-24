@@ -11,7 +11,24 @@ export class LinesOfCodeCollector implements IMetricCollector {
         if (!(Utils.isNode(node) && TSUtils.isFunctionScopeBoundary(node))) {
             return;
         }
-        const linesOfCode = node.getText().split("\n").length;
+        const textLines = node.getText().split("\n");
+        // TODO: pass the SourceFile as parameter if performance is a problem, as this
+        // probably just walks up the AST until it finds a SourceFile
+        const sourceFile = node.getSourceFile();
+        let linesOfCode = 0;
+        let position = node.getStart();
+        textLines.forEach((line) => {
+            const whitespace = line.match(/^\s*/);
+            let whitespaceLength = 0;
+            if (whitespace && whitespace.length > 0) {
+                whitespaceLength = whitespace[0].length;
+            }
+            const startOfLetters = position + whitespaceLength;
+            if (whitespaceLength < line.length && !TSUtils.isPositionInComment(sourceFile, startOfLetters)) {
+                linesOfCode++;
+            }
+            position += line.length;
+        });
         this.linesOfCode.set(node, linesOfCode);
     }
 
