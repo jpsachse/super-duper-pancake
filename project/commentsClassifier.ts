@@ -34,10 +34,10 @@ export class CommentsClassifier {
         const commentText = comment.getSanitizedCommentText().text;
         const sanitizedLines = comment.getSanitizedCommentLines();
         const nextNode = this.sourceMap.getNodeFollowing(comment);
-        const sourceFile = nextNode.getSourceFile();
         if (nextNode) {
+            const sourceFile = nextNode.getSourceFile();
             // Check for a function start
-            if (Utils.isSomeKindOfFunction(nextNode) || Utils.isSomeKindOfFunction(nextNode.parent)) {
+            if (ts.isFunctionLike(nextNode) || ts.isFunctionLike(nextNode.parent)) {
                 comment.classifications.push({commentClass: CommentClass.Header});
             }
             // Check for a member declaration
@@ -56,7 +56,7 @@ export class CommentsClassifier {
         }
         const enclosingNodes = this.sourceMap.getEnclosingNodes(comment);
         for (const parentNode of enclosingNodes) {
-            if (parentNode && Utils.isSomeKindOfFunction(parentNode)) {
+            if (parentNode && ts.isFunctionLike(parentNode)) {
                 comment.classifications.push({commentClass: CommentClass.Inline});
                 break;
             }
