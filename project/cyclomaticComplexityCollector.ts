@@ -26,25 +26,26 @@ export class CyclomaticComplexityCollector implements IMetricCollector {
     private calculateCyclomaticComplexity(node: ts.Node) {
         let complexity = 0;
         const self = this;
-        const complexities = new Map<ts.Node, number>();
         const calculate = (child: ts.Node): void => {
             // if (self.isSomeKindOfBlock(child)) {
-            if (TSUtils.isFunctionScopeBoundary(child)) {
+            if (ts.isFunctionLike(child)) {
                 const old = complexity;
                 complexity = 1;
                 child.forEachChild(calculate);
-                self.nodeComplexities.set(child, complexity);
-                complexities.set(child, complexity);
+                self.nodeComplexities.set(child.body, complexity);
                 complexity = old;
             } else {
                 if (self.isIncreasingCyclomaticComplexity(child)) {
                     complexity++;
                 }
-                return child.forEachChild(calculate);
+                const previous = complexity;
+                child.forEachChild(calculate);
+                if (ts.isBlock(child)) {
+                    self.nodeComplexities.set(child, Math.max(1, complexity - previous));
+                }
             }
         };
         calculate(node);
-        return complexities;
     }
 
     private isIncreasingCyclomaticComplexity(node: ts.Node): boolean {
@@ -65,11 +66,5 @@ export class CyclomaticComplexityCollector implements IMetricCollector {
             node.kind === ts.SyntaxKind.IfStatement ||
             node.kind === ts.SyntaxKind.WhileStatement;
     }
-
-    // private isSomeKindOfBlock(node: ts.Node) {
-    //     const scopeBoundary = TSUtils.isScopeBoundary(node);
-    //     // return scopeBoundary === TSUtils.ScopeBoundary.Block ||
-    //     return       scopeBoundary === TSUtils.ScopeBoundary.Function;
-    // }
 
 }
