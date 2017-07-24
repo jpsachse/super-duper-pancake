@@ -34,9 +34,24 @@ export class CommentsClassifier {
         const commentText = comment.getSanitizedCommentText().text;
         const sanitizedLines = comment.getSanitizedCommentLines();
         const nextNode = this.sourceMap.getNodeFollowing(comment);
+        const sourceFile = nextNode.getSourceFile();
         if (nextNode) {
+            // Check for a function start
             if (Utils.isSomeKindOfFunction(nextNode) || Utils.isSomeKindOfFunction(nextNode.parent)) {
                 comment.classifications.push({commentClass: CommentClass.Header});
+            }
+            // Check for a member declaration
+            if (nextNode.kind === ts.SyntaxKind.PropertyDeclaration) {
+                comment.classifications.push({commentClass: CommentClass.Member});
+            } else {
+                let child = nextNode.getChildCount(sourceFile) > 0 ? nextNode.getChildAt(0, sourceFile) : undefined;
+                while (child !== undefined && child.getStart(sourceFile) === nextNode.getStart(sourceFile)) {
+                    if (child.kind === ts.SyntaxKind.PropertyDeclaration) {
+                        comment.classifications.push({commentClass: CommentClass.Member});
+                        break;
+                    }
+                    child = child.getChildCount(sourceFile) > 0 ? child.getChildAt(0, sourceFile) : undefined;
+                }
             }
         }
         const enclosingNodes = this.sourceMap.getEnclosingNodes(comment);

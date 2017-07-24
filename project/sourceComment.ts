@@ -4,6 +4,7 @@ export enum CommentClass {
     Copyright,
     Header,
     Inline,
+    Member,
     Section,
     Code,
     Task,
