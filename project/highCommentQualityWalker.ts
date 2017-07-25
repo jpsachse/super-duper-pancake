@@ -3,7 +3,7 @@ import * as ts from "typescript";
 import { CommentsClassifier } from "./commentsClassifier";
 import { CustomCodeDetector } from "./customCodeDetector";
 import { ExistingRuleBasedCodeDetector } from "./existingRuleBasedCodeDetector";
-import { CyclomaticComplexityCollector, LinesOfCodeCollector } from "./metricCollectors";
+import { CyclomaticComplexityCollector, LinesOfCodeCollector, NestingLevelCollector } from "./metricCollectors";
 import { CommentClass, SourceComment } from "./sourceComment";
 import { SourceMap } from "./sourceMap";
 import { TsCompilerBasedCodeDetector } from "./tsCompilerBasedCodeDetector";
@@ -22,7 +22,8 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
         // this.printGetChildrenForEach(sourceFile);
         const locCollector = new LinesOfCodeCollector();
         const ccCollector = new CyclomaticComplexityCollector();
-        const sourceMap = new SourceMap(sourceFile, [ccCollector, locCollector]);
+        const nestingLevelCollector = new NestingLevelCollector();
+        const sourceMap = new SourceMap(sourceFile, [ccCollector, locCollector, nestingLevelCollector]);
         // TODO: use this.options() instead of hardcoded string
         // Also: provide an option to choose from different code detection methods
         // const codeDetector = new CustomCodeDetector("./comment-classification-rules/no-code")
