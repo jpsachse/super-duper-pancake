@@ -40,7 +40,7 @@ export class TsCompilerBasedCodeDetector extends CodeDetector {
                     const errors = this.getSyntacticErrors(compilerOptions, compilerHost);
                     if (errors.length === 0) {
                         if (start === 0 && end === commentLines.length - 1) {
-                            comment.classifications.push(this.classification);
+                            comment.classifications.push(this.defaultClassification);
                             return;
                         }
                         lines.push(...Utils.createRange(start, end));
@@ -54,8 +54,9 @@ export class TsCompilerBasedCodeDetector extends CodeDetector {
             end = commentLines.length - 1;
         }
         if (lines.length > 0) {
-            this.classification.lines = lines;
-            comment.classifications.push(this.classification);
+            const classification = this.defaultClassification;
+            classification.lines = lines;
+            comment.classifications.push(classification);
         }
     }
 

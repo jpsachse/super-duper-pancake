@@ -23,9 +23,11 @@ export class ExistingRuleBasedCodeDetector extends CodeDetector {
         });
         if (lines.length === 0) { return; }
         if (lines.length < commentLines.length) {
-            this.classification.lines = lines;
+            comment.classifications.push(this.classification(lines));
+        } else {
+            comment.classifications.push(this.defaultClassification);
         }
-        comment.classifications.push(this.classification);
+
     }
 
     private setupLinter(): Lint.Linter {
