@@ -18,8 +18,8 @@ interface ICommentGroup {
 export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
 
     public walk(sourceFile: ts.SourceFile) {
-        this.printForEachChild(sourceFile);
-        this.printGetChildrenForEach(sourceFile);
+        // this.printForEachChild(sourceFile);
+        // this.printGetChildrenForEach(sourceFile);
         const locCollector = new LinesOfCodeCollector();
         const ccCollector = new CyclomaticComplexityCollector();
         const sourceMap = new SourceMap(sourceFile, [ccCollector, locCollector]);
@@ -55,7 +55,7 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
             });
         });
         sourceMap.getAllFunctionLikes().forEach((node) => {
-            if (ts.isFunctionLike(node) && ccCollector.getComplexity(node.body) > 10) {
+            if (ccCollector.getComplexity(node.body) > 10) {
                 const children: ts.Node[] = [];
                 const addChild = (child) => {
                     if (ts.isBlock(child)) {
@@ -76,7 +76,6 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
                         this.addFailureAtNode(child.parent, "CC: " + complexity);
                     }
                 });
-                // this.addFailureAtNode(children[0].parent, "This seems too complex");
             }
         });
     }
