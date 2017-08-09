@@ -6,9 +6,11 @@
   "dependencies": {
     "@types/node": "^7.0.31",
     "node-interval-tree": "^1.1.4",
+    "ts-data.stack": "^1.0.6",
     "tslib": "^1.7.1",
     "tslint": "^5.3.2",
     "typescript": "^2.3.3",
+    "typescript-collections": "^1.2.3",
     "typescript.api": "^0.7.7"
   },
   "devDependencies": {

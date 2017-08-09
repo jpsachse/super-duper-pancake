@@ -12,17 +12,27 @@ export class SourceMap {
     private nodeLocations = new IntervalTree<DataInterval<SourcePart>>();
     private mergedComments: SourceComment[];
     private functionLikes: ts.FunctionLikeDeclaration[] = [];
+    private blockStarts = new Map<number, ts.Block>();
+    private blockEnds = new Map<number, ts.Block>();
 
     constructor(private sourceFile: ts.SourceFile, collectors: IMetricCollector[]) {
         const addNodeToMap = (nodeOrComment: SourcePart) => {
             let partStart = nodeOrComment.pos;
+            const partEnd = nodeOrComment.end;
+            let startLine = sourceFile.getLineAndCharacterOfPosition(partStart).line;
+            const endLine = sourceFile.getLineAndCharacterOfPosition(partEnd).line;
             if (Utils.isNode(nodeOrComment)) {
+                partStart = nodeOrComment.getStart(sourceFile);
+                startLine = sourceFile.getLineAndCharacterOfPosition(partStart).line;
                 if (ts.isFunctionLike(nodeOrComment)) {
                     this.functionLikes.push(nodeOrComment);
                 }
-                partStart = nodeOrComment.getStart(sourceFile);
+                if (ts.isBlock(nodeOrComment)) {
+                    this.blockStarts.set(startLine, nodeOrComment);
+                    this.blockEnds.set(endLine, nodeOrComment);
+                }
             }
-            const partEnd = nodeOrComment.end;
+
             collectors.forEach((collector) => collector.visitNode(nodeOrComment));
             this.nodeLocations.insert({
                 low: partStart,
@@ -30,8 +40,6 @@ export class SourceMap {
                 data: nodeOrComment,
             });
             this.positionOfNode.set(nodeOrComment, {pos: partStart, end: partEnd});
-            const startLine = sourceFile.getLineAndCharacterOfPosition(partStart).line;
-            const endLine = sourceFile.getLineAndCharacterOfPosition(partEnd).line;
             for (let line = startLine; line <= endLine; ++line) {
                 if (!this.nodesOfLine.has(line)) {
                     this.nodesOfLine.set(line, [nodeOrComment]);
@@ -77,7 +85,7 @@ export class SourceMap {
     }
 
     public getNodeAfterLine(line: number): ts.Node | undefined {
-        const nodes = this.nodesOfLine[line];
+        const nodes = this.nodesOfLine.get(line);
         if (!nodes || nodes.length === 0) { return; }
         return this.getNodeFollowing(nodes[0]);
     }
@@ -88,14 +96,58 @@ export class SourceMap {
         return enclosingNodes.filter((sourcePart) => Utils.isNode(sourcePart)) as ts.Node[];
     }
 
-    public getCommentsForNode(node: ts.Node): SourceComment[] {
+    /**
+     * Fetches the last node of the given line and then traverses the AST upwards until it finds
+     * either a statement or declaration, which is returned.
+     * @param line The line the node is in.
+     * @returns {(ts.Node | undefined)} A node or undefined, if the requested line does not contain code.
+     */
+    public getMostEnclosingNodeForLine(line: number): ts.Node | undefined {
+        // TODO: cope with blocks ending at the end of a line of code, which currently results in
+        // returning the wrong node (the statement corresponding to the enclosing block and not
+        // the actual node that started the corresponding line).
+        // Easy possible fix: while the fetched node from the array is a closing bracket, reduce
+        // the used index, until a non-bracket node is found (if any) and then use that to find a parent.
+        // This could also solve the problem of closing brackets resulting in a unwanted recalculation
+        // of complexity scores for block-starting lines.
+        const nodes = this.nodesOfLine.get(line);
+        if (!nodes || nodes.length === 0) { return; }
+        let node = nodes[nodes.length - 1];
+        if (!Utils.isNode(node)) { return; }
+        while (node.parent !== undefined && !Utils.isStatement(node) && !Utils.isDeclaration(node)) {
+            node = node.parent;
+        }
+        return node;
+    }
+
+    public isBlockStartingInLine(line: number): boolean {
+        return this.blockStarts.has(line);
+    }
+
+    public getBlockStartingInLine(line: number): ts.Block {
+        return this.blockStarts.get(line);
+    }
+
+    public isBlockEndingInLine(line: number): boolean {
+        return this.blockEnds.has(line);
+    }
+
+    public getCommentsBelongingToNode(node: ts.Node): SourceComment[] {
         const line = ts.getLineAndCharacterOfPosition(this.sourceFile, node.pos).line;
+        return this.getCommentsBelongingToLine(line);
+    }
+
+    public getCommentsBelongingToLine(line: number): SourceComment[] {
         const leadingNodes = this.nodesOfLine.get(line - 1) || [];
         const trailingNodes = this.nodesOfLine.get(line) || [];
         const leadingComments = leadingNodes.filter((part) => !Utils.isNode(part));
         const trailingComments = trailingNodes.filter((part) => !Utils.isNode(part));
         leadingComments.push(...trailingComments);
         return leadingComments as SourceComment[];
+    }
+
+    public getCommentsInLine(line: number): SourceComment[] {
+        return (this.nodesOfLine.get(line) || []).filter((part) => !Utils.isNode(part)) as SourceComment[];
     }
 
     public getAllComments(): SourceComment[] {

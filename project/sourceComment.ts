@@ -102,6 +102,7 @@ export class SourceComment implements TextRange {
         const lines = text.split("\n");
         const result = [];
         let isMultiLineComment = false;
+        // TODO: handle multiline comment ending + any other comment starting in the same line
         lines.forEach((line) => {
             if (isMultiLineComment) {
                 // Multiline comment end
