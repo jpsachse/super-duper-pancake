@@ -103,6 +103,13 @@ export class SourceMap {
      * @returns {(ts.Node | undefined)} A node or undefined, if the requested line does not contain code.
      */
     public getMostEnclosingNodeForLine(line: number): ts.Node | undefined {
+        // Don't return anything for empty lines
+        const lineStart = this.sourceFile.getPositionOfLineAndCharacter(line, 0);
+        const lineEnd = this.sourceFile.getLineEndOfPosition(lineStart);
+        const lineText = this.sourceFile.getFullText().substring(lineStart, lineEnd);
+        if (lineStart === lineEnd || lineText.replace(/\s*/, "").length === 0) {
+            return;
+        }
         // TODO: cope with blocks ending at the end of a line of code, which currently results in
         // returning the wrong node (the statement corresponding to the enclosing block and not
         // the actual node that started the corresponding line).
