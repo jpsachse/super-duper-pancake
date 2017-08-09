@@ -99,7 +99,7 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
                 currentSectionStartLine = currentLine;
             }
 
-            if (!enclosingNode || enclosingNode === node) {
+            if (!enclosingNode) {
                 // A line filled only with comments, just like this very one.
                 if (commentsInLine.length > 0) {
                     continue;
@@ -116,6 +116,7 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
                 sectionComplexity = 0;
                 currentSectionStartLine = -1;
                 lineComplexities.clear();
+                continue;
             }
 
             let lineComplexity = 0;
@@ -127,21 +128,26 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
                 const blockNode = sourceMap.getBlockStartingInLine(currentLine);
                 const blockComplexity = this.analyze(blockNode, sourceFile, sourceMap);
                 lineComplexity += blockComplexity;
-                currentLine = ts.getLineAndCharacterOfPosition(sourceFile, blockNode.getEnd()).line;
             }
 
             // TODO: use a meaningful threshold here
             if (lineComplexity > 5) {
-                this.requireCommentForLine(currentLine, sourceMap, sourceFile, "This is a complex statement.");
-                // this.addFailureAtNode(enclosingNode, "This is a complex statement.");
+                this.requireCommentForLine(currentLine, sourceMap, sourceFile,
+                                           "This is a complex statement: " + lineComplexity);
             }
 
             sectionComplexity += lineComplexity;
             totalComplexity += lineComplexity;
             lineComplexities.add({line: currentLine, complexity: lineComplexity});
 
+            // TODO: this is just here for live-feedback purposes
             const failureStart = sourceFile.getPositionOfLineAndCharacter(currentLine, 0);
             this.addFailureAt(failureStart, 1, "section: " + sectionComplexity + " - line: " + lineComplexity);
+
+            if (sourceMap.isBlockStartingInLine(currentLine)) {
+                const blockNode = sourceMap.getBlockStartingInLine(currentLine);
+                currentLine = ts.getLineAndCharacterOfPosition(sourceFile, blockNode.getEnd()).line;
+            }
         }
         // require comments for complex sections
         if (totalComplexity > 7) {
