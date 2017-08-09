@@ -20,6 +20,10 @@ interface ICommentGroup {
 
 export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
 
+    // lines that should have a comment, mapped to the string representing the reason
+    // TODO: make this single string instead of array
+    private requiredCommentLines = new Map<number, [string]>();
+
     public walk(sourceFile: ts.SourceFile) {
         // this.printForEachChild(sourceFile);
         // this.printGetChildrenForEach(sourceFile);
@@ -65,6 +69,7 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
         sourceMap.getAllFunctionLikes().forEach((node) => {
             this.analyze(node, sourceFile, sourceMap);
         });
+        this.addFailuresForCommentRequirements(sourceMap, sourceFile);
     }
 
     /**
@@ -108,8 +113,9 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
 
                 // require comments for complex sections
                 if (sectionComplexity > 7) {
-                    if (!this.requireCommentForLine(currentSectionStartLine, sourceMap, sourceFile)) {
-                        this.requireCommentForLine(lineComplexities.dequeue().line, sourceMap, sourceFile);
+                    if (!this.requireCommentForLine(currentSectionStartLine, sourceMap, sourceFile, "sectionstart: " + sectionComplexity)) {
+                        const complexity = lineComplexities.dequeue();
+                        this.requireCommentForLine(complexity.line, sourceMap, sourceFile, "most complex: " + complexity.complexity + " - section: " + sectionComplexity);
                     }
                 }
 
@@ -151,8 +157,9 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
         }
         // require comments for complex sections
         if (totalComplexity > 7) {
-            if (!this.requireCommentForLine(currentSectionStartLine, sourceMap, sourceFile)) {
-                this.requireCommentForLine(lineComplexities.dequeue().line, sourceMap, sourceFile);
+            if (!this.requireCommentForLine(startLine, sourceMap, sourceFile, "sectionstart (total): " + totalComplexity)) {
+                const complexity = lineComplexities.dequeue();
+                this.requireCommentForLine(complexity.line, sourceMap, sourceFile, "most complex: " + complexity.complexity + " - total: " + totalComplexity);
             }
         }
         return totalComplexity;
@@ -167,16 +174,29 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
      */
     private requireCommentForLine(line: number, sourceMap: SourceMap,
                                   sourceFile: ts.SourceFile, failureMessage?: string): boolean {
+        // TODO: don't add another requirement instead of using an array if already present
         const correspondingComments = sourceMap.getCommentsBelongingToLine(line);
         failureMessage = failureMessage || "This line should be commented";
         // TODO: check meaningfulness of comments instead of just plain existence
         if (correspondingComments.length === 0) {
-            const node = sourceMap.getMostEnclosingNodeForLine(line);
-            const end = sourceFile.getLineEndOfPosition(node.getStart());
-            this.addFailure(node.getStart(), end, failureMessage);
+            if (this.requiredCommentLines.has(line)) {
+                this.requiredCommentLines.get(line).push(failureMessage);
+            } else {
+                this.requiredCommentLines.set(line, [failureMessage]);
+            }
             return true;
         }
         return false;
+    }
+
+    private addFailuresForCommentRequirements(sourceMap: SourceMap, sourceFile: ts.SourceFile) {
+        this.requiredCommentLines.forEach((reasons, line) => {
+            const node = sourceMap.getMostEnclosingNodeForLine(line);
+            const end = sourceFile.getLineEndOfPosition(node.getStart());
+            reasons.forEach( (reason) => {
+                this.addFailure(node.getStart(), end, reason);
+            });
+        });
     }
 
     private addFailureForClassification(comment: SourceComment, classificationIndex: number) {
