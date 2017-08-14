@@ -15,7 +15,7 @@ export class SourceMap {
     private blockStarts = new Map<number, ts.Block>();
     private blockEnds = new Map<number, ts.Block>();
 
-    constructor(private sourceFile: ts.SourceFile, collectors: IMetricCollector[]) {
+    constructor(public readonly sourceFile: ts.SourceFile, collectors: IMetricCollector[]) {
         const addNodeToMap = (nodeOrComment: SourcePart) => {
             let partStart = nodeOrComment.pos;
             const partEnd = nodeOrComment.end;
