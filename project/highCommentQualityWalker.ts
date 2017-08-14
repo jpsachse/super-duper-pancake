@@ -94,6 +94,7 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
             return a.complexity - b.complexity;
         };
         const lineComplexities = new PriorityQueue<ILineComplexity>(sortDescending);
+
         for (let currentLine = startLine + 1; currentLine < endLine; ++currentLine) {
             const commentsInLine = sourceMap.getCommentsInLine(currentLine);
             const correspondingComments = sourceMap.getCommentsBelongingToLine(currentLine);
@@ -144,9 +145,9 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
             totalComplexity += lineComplexity;
             lineComplexities.add({line: currentLine, complexity: lineComplexity});
 
-            // TODO: this is just here for live-feedback purposes
-            const failureStart = sourceMap.sourceFile.getPositionOfLineAndCharacter(currentLine, 0);
-            this.addFailureAt(failureStart, 1, "section: " + sectionComplexity + " - line: " + lineComplexity);
+            // // TODO: this is just here for live-feedback purposes
+            // const failureStart = sourceMap.sourceFile.getPositionOfLineAndCharacter(currentLine, 0);
+            // this.addFailureAt(failureStart, 1, "section: " + sectionComplexity + " - line: " + lineComplexity);
 
             if (sourceMap.isBlockStartingInLine(currentLine)) {
                 const blockNode = sourceMap.getBlockStartingInLine(currentLine);
