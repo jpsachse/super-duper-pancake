@@ -3,6 +3,7 @@ import * as Lint from "tslint";
 import * as ts from "typescript";
 import { PriorityQueue } from "typescript-collections";
 import { CommentClassifier } from "./commentClassifier";
+import CommentQualityEvaluator from "./commentQualityEvaluator";
 import { CustomCodeDetector } from "./customCodeDetector";
 import { ExistingRuleBasedCodeDetector } from "./existingRuleBasedCodeDetector";
 // tslint:disable-next-line:max-line-length
