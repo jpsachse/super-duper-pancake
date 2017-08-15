@@ -85,6 +85,9 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
      */
     private analyze(node: ts.Node, sourceMap: SourceMap): number {
         const sectionComplexityThreshold = 7;
+        const nodeTotalComplexityThreshold = 5;
+        const lineComplexityThreshold = 3;
+
         let sectionComplexity = 0.0;
         let totalComplexity = 0.0;
         const startLine = sourceMap.sourceFile.getLineAndCharacterOfPosition(node.getStart()).line;
@@ -94,6 +97,7 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
             return a.complexity - b.complexity;
         };
         const lineComplexities = new PriorityQueue<ILineComplexity>(sortDescending);
+        const sectionComplexities = new PriorityQueue<ILineComplexity>(sortDescending);
 
         for (let currentLine = startLine + 1; currentLine < endLine; ++currentLine) {
             const commentsInLine = sourceMap.getCommentsInLine(currentLine);
@@ -111,10 +115,15 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
                 }
                 // One code section ending, a new one starting.
 
+                // TODO: this is just here for live-feedback purposes
+                const failureStart = sourceMap.sourceFile.getPositionOfLineAndCharacter(currentSectionStartLine, 0);
+                this.addFailureAt(failureStart, 1, "sectionComplexity: " + sectionComplexity);
+
                 // require comments for complex sections
                 this.enforceCommentRequirementForSection(sectionComplexity, currentSectionStartLine,
                         sectionComplexityThreshold, sourceMap, lineComplexities);
 
+                sectionComplexities.add({line: currentSectionStartLine, complexity: sectionComplexity});
                 sectionComplexity = 0;
                 currentSectionStartLine = -1;
                 lineComplexities.clear();
@@ -127,6 +136,14 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
             // TODO: this includes comment lines, as they don't break sections and this is just start - end
             lineComplexity += Math.min(1, ((currentLine + 1) - currentSectionStartLine) / 7);
 
+            // Compare complexity here before adding any block/child related complexities,
+            // as I want to catch complex lines in themselves and not nearly everything that has
+            // a code block.
+            if (lineComplexity > lineComplexityThreshold) {
+                this.requireCommentForLine(currentLine, sourceMap,
+                                           "This is a complex statement: " + lineComplexity);
+            }
+
             if (sourceMap.isBlockStartingInLine(currentLine)) {
                 const blockNode = sourceMap.getBlockStartingInLine(currentLine);
                 // Cyclomatic complexity. Only useful for block-nodes
@@ -135,31 +152,24 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
                 lineComplexity += blockComplexity;
             }
 
-            // TODO: use a meaningful threshold here
-            if (lineComplexity > 5) {
-                this.requireCommentForLine(currentLine, sourceMap,
-                                           "This is a complex statement: " + lineComplexity);
-            }
-
             sectionComplexity += lineComplexity;
             totalComplexity += lineComplexity;
             lineComplexities.add({line: currentLine, complexity: lineComplexity});
-
-            // // TODO: this is just here for live-feedback purposes
-            // const failureStart = sourceMap.sourceFile.getPositionOfLineAndCharacter(currentLine, 0);
-            // this.addFailureAt(failureStart, 1, "section: " + sectionComplexity + " - line: " + lineComplexity);
 
             if (sourceMap.isBlockStartingInLine(currentLine)) {
                 const blockNode = sourceMap.getBlockStartingInLine(currentLine);
                 currentLine = ts.getLineAndCharacterOfPosition(sourceMap.sourceFile, blockNode.getEnd()).line;
             }
         }
+        if (sectionComplexities.isEmpty()) {
+            sectionComplexities.add({line: currentSectionStartLine, complexity: sectionComplexity});
+        }
         // require comments for complex sections
         const didAdd = this.enforceCommentRequirementForSection(sectionComplexity, currentSectionStartLine,
                 sectionComplexityThreshold, sourceMap, lineComplexities);
         if (!didAdd) {
             this.enforceCommentRequirementForSection(totalComplexity, startLine,
-                    sectionComplexityThreshold, sourceMap, lineComplexities);
+                    nodeTotalComplexityThreshold, sourceMap, sectionComplexities);
         }
         return totalComplexity;
     }
@@ -169,8 +179,15 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
                                                 lineComplexities: PriorityQueue<ILineComplexity>) {
         if (complexity > threshold) {
             if (!this.requireCommentForLine(sectionStartLine, sourceMap, "sectionstart: " + complexity)) {
-                const highestComplexity = lineComplexities.dequeue();
-                this.requireCommentForLine(highestComplexity.line, sourceMap, "most complex: " + highestComplexity.complexity + " - total: " + complexity);
+                const findCommentRequirementLocation = (): boolean => {
+                    const highestComplexity = lineComplexities.dequeue();
+                    if (highestComplexity === undefined) { return true; }
+                    const reason = "most complex: " + highestComplexity.complexity + " - total: " + complexity;
+                    return this.requireCommentForLine(highestComplexity.line, sourceMap, reason);
+                };
+                while (true) {
+                    if (findCommentRequirementLocation()) { break; }
+                }
             }
             return true;
         }
@@ -192,6 +209,9 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
         if (correspondingComments.length === 0) {
             if (this.requiredCommentLines.has(line)) {
                 this.requiredCommentLines.get(line).push(failureMessage);
+                // TODO: this is here to allow multiple requirements per line during development
+                // but also force the rest of the code to search for additional lines that should have comments
+                return false;
             } else {
                 this.requiredCommentLines.set(line, [failureMessage]);
             }
