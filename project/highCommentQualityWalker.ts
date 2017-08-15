@@ -2,7 +2,7 @@ import Stack from "ts-data.stack";
 import * as Lint from "tslint";
 import * as ts from "typescript";
 import { PriorityQueue } from "typescript-collections";
-import { CommentsClassifier } from "./commentsClassifier";
+import { CommentClassifier } from "./commentClassifier";
 import { CustomCodeDetector } from "./customCodeDetector";
 import { ExistingRuleBasedCodeDetector } from "./existingRuleBasedCodeDetector";
 // tslint:disable-next-line:max-line-length
@@ -44,7 +44,7 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
         // const ruleDirectory = "./node_modules/tslint/lib/rules";
         // const codeDetector = new ExistingRuleBasedCodeDetector(ruleDirectory);
         const codeDetector = new TsCompilerBasedCodeDetector();
-        const classifier = new CommentsClassifier(codeDetector, sourceMap);
+        const classifier = new CommentClassifier(codeDetector, sourceMap);
 
         sourceMap.getAllComments().forEach((commentGroup) => {
             classifier.classify(commentGroup);

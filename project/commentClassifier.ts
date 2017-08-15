@@ -13,7 +13,7 @@ interface IInternalClassificationResult {
     description: string;
 }
 
-export class CommentsClassifier {
+export class CommentClassifier {
 
 // Comment categories from "Quality analysis of source code comments."
 //   - Copyright comments
