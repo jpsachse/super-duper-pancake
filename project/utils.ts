@@ -59,4 +59,34 @@ export default class Utils {
                 node.kind === ts.SyntaxKind.VariableDeclaration);
     }
 
+    /**
+     * Gets the intersection of two arrays
+     * @param first First array
+     * @param second Second array
+     */
+    public static getIntersection<T>(first: T[], second: T[]): T[] {
+        const result: T[] = [];
+        let i = 0;
+        let o = 0;
+        while (i < first.length && o < second.length) {
+            if (first[i] === second[o]) {
+                result.push(first[o]);
+                i++;
+                o++;
+            } else if (first[i] < second[o]) {
+                i++;
+            } else {
+                o++;
+            }
+        }
+        return result;
+    }
+
+    public static splitIntoNormalizedWords(camelCaseText: string): string[] {
+        return camelCaseText.replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+                            .replace(/([A-Z])([A-Z][a-z])/g, "$1 $2")
+                            .toLowerCase()
+                            .split(" ");
+    }
+
 }
