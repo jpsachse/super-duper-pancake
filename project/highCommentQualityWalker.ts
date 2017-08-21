@@ -165,9 +165,12 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
         if (sectionComplexities.isEmpty()) {
             sectionComplexities.add({line: currentSectionStartLine, complexity: sectionComplexity});
         }
-        // require comments for complex sections
-        const didAdd = this.enforceCommentRequirementForSection(sectionComplexity, currentSectionStartLine,
+        // require comments for complex sections, but only if there is more than one section in a function
+        const didAdd = false;
+        if (sectionComplexities.size() > 1) {
+            this.enforceCommentRequirementForSection(sectionComplexity, currentSectionStartLine,
                 sectionComplexityThreshold, sourceMap, lineComplexities);
+        }
         if (!didAdd) {
             this.enforceCommentRequirementForSection(totalComplexity, startLine,
                     nodeTotalComplexityThreshold, sourceMap, sectionComplexities);
