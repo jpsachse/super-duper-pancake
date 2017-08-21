@@ -64,13 +64,41 @@ export class SourceMap {
         const position = this.positionOfNode.get(node);
         if (!position) { return; }
         const endingLine = this.sourceFile.getLineAndCharacterOfPosition(position.end).line;
-        const followingNodes = this.nodesOfLine.get(endingLine + 1);
+        const nodesSpanningLine = this.nodesOfLine.get(endingLine);
+        const followingNodes = [this.sourceFile as SourcePart].concat(...this.nodesOfLine.get(endingLine + 1));
         if (!followingNodes) { return; }
-        // As creation of this list is done by iterating the AST, starting at parent nodes,
-        // the outermost node of the line is the one containing all other calls.
-        const nextElement = followingNodes[0];
-        if (Utils.isNode(nextElement)) {
-            return nextElement;
+        let parentBlock: ts.Node;
+        let i = nodesSpanningLine.length;
+        while (i > 0) {
+            i--;
+            const currentSourcePart = nodesSpanningLine[i];
+            if (Utils.isNode(currentSourcePart) && !ts.isJSDoc(currentSourcePart)) {
+                parentBlock = currentSourcePart;
+                break;
+            }
+        }
+        if (parentBlock === undefined) {
+            parentBlock = this.sourceFile;
+        }
+        // Go up the list of nodes touching a line from the back until we find the parent
+        // determined above and use the node directly after it.
+        i = followingNodes.length;
+        while (i > 0) {
+            i--;
+            if (followingNodes[i] === parentBlock) {
+                let o = i;
+                while (o < followingNodes.length - 1) {
+                    o++;
+                    const result = followingNodes[o];
+                    if (Utils.isNode(result)) {
+                        if (TSUtils.isSyntaxList(result)) {
+                            continue;
+                        }
+                        return result;
+                    }
+                }
+                break;
+            }
         }
         return;
     }
