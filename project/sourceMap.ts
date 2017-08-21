@@ -64,7 +64,7 @@ export class SourceMap {
         const position = this.positionOfNode.get(node);
         if (!position) { return; }
         const endingLine = this.sourceFile.getLineAndCharacterOfPosition(position.end).line;
-        return this.getNodeAfterLine(endingLine);
+        return this.getFirstNodeAfterLine(endingLine);
     }
 
     public getSourcePartBefore(node: SourcePart): SourcePart | undefined {
@@ -76,7 +76,11 @@ export class SourceMap {
         return previousNodes[previousNodes.length - 1];
     }
 
-    public getNodeAfterLine(line: number): ts.Node | undefined {
+    public getFirstNodeInLine(line: number): ts.Node | undefined {
+        return this.getFirstNodeAfterLine(line - 1);
+    }
+
+    public getFirstNodeAfterLine(line: number): ts.Node | undefined {
         const nodesSpanningLine = this.nodesOfLine.get(line);
         const followingNodes = [this.sourceFile as SourcePart].concat(...this.nodesOfLine.get(line + 1));
         if (!followingNodes) { return; }

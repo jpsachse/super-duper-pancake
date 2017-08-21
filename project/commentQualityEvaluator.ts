@@ -22,7 +22,10 @@ export default class CommentQualityEvaluator {
             return CommentQuality.Unhelpful;
         }
         const commentEndLine = sourceMap.sourceFile.getLineAndCharacterOfPosition(comment.end).line;
-        const nextNode = sourceMap.getNodeAfterLine(commentEndLine);
+        let nextNode = sourceMap.getFirstNodeInLine(commentEndLine);
+        if (nextNode === undefined) {
+            nextNode = sourceMap.getFirstNodeAfterLine(commentEndLine);
+        }
         if (nextNode !== undefined && Utils.isDeclaration(nextNode)) {
             // TODO: this has to be refined considerably, e.g., by stripping common fill words (a, this, any, ...)
             // and also add handling for texts that reference parameters of functions
