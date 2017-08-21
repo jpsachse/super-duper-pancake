@@ -23,7 +23,7 @@ export default class CommentQualityEvaluator {
         }
         const commentEndLine = sourceMap.sourceFile.getLineAndCharacterOfPosition(comment.end).line;
         const nextNode = sourceMap.getNodeAfterLine(commentEndLine);
-        if (Utils.isDeclaration(nextNode)) {
+        if (nextNode !== undefined && Utils.isDeclaration(nextNode)) {
             // TODO: this has to be refined considerably, e.g., by stripping common fill words (a, this, any, ...)
             // and also add handling for texts that reference parameters of functions
             const name = ts.getNameOfDeclaration(nextNode);
