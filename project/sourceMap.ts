@@ -64,8 +64,21 @@ export class SourceMap {
         const position = this.positionOfNode.get(node);
         if (!position) { return; }
         const endingLine = this.sourceFile.getLineAndCharacterOfPosition(position.end).line;
-        const nodesSpanningLine = this.nodesOfLine.get(endingLine);
-        const followingNodes = [this.sourceFile as SourcePart].concat(...this.nodesOfLine.get(endingLine + 1));
+        return this.getNodeAfterLine(endingLine);
+    }
+
+    public getSourcePartBefore(node: SourcePart): SourcePart | undefined {
+        const position = this.positionOfNode.get(node);
+        if (!position) { return; }
+        const startLine = this.sourceFile.getLineAndCharacterOfPosition(position.pos).line;
+        const previousNodes = this.nodesOfLine.get(startLine - 1);
+        if (!previousNodes) { return; }
+        return previousNodes[previousNodes.length - 1];
+    }
+
+    public getNodeAfterLine(line: number): ts.Node | undefined {
+        const nodesSpanningLine = this.nodesOfLine.get(line);
+        const followingNodes = [this.sourceFile as SourcePart].concat(...this.nodesOfLine.get(line + 1));
         if (!followingNodes) { return; }
         let parentBlock: ts.Node;
         let i = nodesSpanningLine.length;
@@ -101,21 +114,6 @@ export class SourceMap {
             }
         }
         return;
-    }
-
-    public getSourcePartBefore(node: SourcePart): SourcePart | undefined {
-        const position = this.positionOfNode.get(node);
-        if (!position) { return; }
-        const startLine = this.sourceFile.getLineAndCharacterOfPosition(position.pos).line;
-        const previousNodes = this.nodesOfLine.get(startLine - 1);
-        if (!previousNodes) { return; }
-        return previousNodes[previousNodes.length - 1];
-    }
-
-    public getNodeAfterLine(line: number): ts.Node | undefined {
-        const nodes = this.nodesOfLine.get(line);
-        if (!nodes || nodes.length === 0) { return; }
-        return this.getNodeFollowing(nodes[0]);
     }
 
     public getEnclosingNodes(element: SourcePart): ts.Node[] {
