@@ -75,7 +75,7 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
         sourceMap.getAllFunctionLikes().forEach((node) => {
             this.analyze(node, sourceMap);
         });
-        this.addFailuresForCommentRequirements(sourceMap, sourceFile);
+        this.addFailuresForCommentRequirements(sourceMap);
     }
 
     /**
@@ -228,10 +228,24 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
         return false;
     }
 
-    private addFailuresForCommentRequirements(sourceMap: SourceMap, sourceFile: ts.SourceFile) {
+    private addFailuresForCommentRequirements(sourceMap: SourceMap) {
         this.requiredCommentLines.forEach((reasons, line) => {
             const node = sourceMap.getMostEnclosingNodeForLine(line);
-            const end = sourceFile.getLineEndOfPosition(node.getStart());
+            // Skip adding failures for comment requirements if the line above
+            // (i.e., the line, where the previous enclosing node starts) also has a comment requirement.
+            const previousNode = sourceMap.getSourcePartBefore(node);
+            if (previousNode) {
+                let previousLine = sourceMap.sourceFile.getLineAndCharacterOfPosition(previousNode.pos).line;
+                const previousEnclosingNode = sourceMap.getMostEnclosingNodeForLine(previousLine);
+                if (previousEnclosingNode) {
+                    const enclosingStart = previousEnclosingNode.getStart();
+                    previousLine = sourceMap.sourceFile.getLineAndCharacterOfPosition(enclosingStart).line;
+                    if (this.requiredCommentLines.has(previousLine)) {
+                        return;
+                    }
+                }
+            }
+            const end = sourceMap.sourceFile.getLineEndOfPosition(node.getStart());
             reasons.forEach( (reason) => {
                 this.addFailure(node.getStart(), end, reason);
             });
