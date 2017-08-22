@@ -88,7 +88,6 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
         const sectionComplexityThreshold = 7;
         const nodeTotalComplexityThreshold = 5;
         const lineComplexityThreshold = 3;
-
         let sectionComplexity = 0.0;
         let totalComplexity = 0.0;
         const startLine = sourceMap.sourceFile.getLineAndCharacterOfPosition(node.getStart()).line;
@@ -100,6 +99,7 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
         const lineComplexities = new PriorityQueue<ILineComplexity>(sortDescending);
         const sectionComplexities = new PriorityQueue<ILineComplexity>(sortDescending);
 
+        let previousLineWasCommentOnly = false;
         for (let currentLine = startLine + 1; currentLine < endLine; ++currentLine) {
             const commentsInLine = sourceMap.getCommentsInLine(currentLine);
             const correspondingComments = sourceMap.getCommentsBelongingToLine(currentLine);
@@ -111,31 +111,33 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
 
             if (!enclosingNode) {
                 // A line filled only with comments, just like this very one.
-                if (commentsInLine.length > 0) {
+                if (commentsInLine.length > 0 && !previousLineWasCommentOnly) {
+                    previousLineWasCommentOnly = true;
                     continue;
                 }
-                // One code section ending, a new one starting.
-
                 // TODO: this is just here for live-feedback purposes
                 const failureStart = sourceMap.sourceFile.getPositionOfLineAndCharacter(currentSectionStartLine, 0);
                 this.addFailureAt(failureStart, 1, "sectionComplexity: " + sectionComplexity);
 
-                // require comments for complex sections
-                this.enforceCommentRequirementForSection(sectionComplexity, currentSectionStartLine,
-                        sectionComplexityThreshold, sourceMap, lineComplexities);
-
-                sectionComplexities.add({line: currentSectionStartLine, complexity: sectionComplexity});
-                sectionComplexity = 0;
+                // One code section ending, a new one starting.
+                if (sectionComplexity > 0) {
+                    // require comments for complex sections
+                    this.enforceCommentRequirementForSection(sectionComplexity, sectionComplexityThreshold,
+                            currentSectionStartLine, sourceMap, lineComplexities, lineComplexityThreshold);
+                    sectionComplexities.add({line: currentSectionStartLine, complexity: sectionComplexity});
+                    sectionComplexity = 0;
+                }
                 currentSectionStartLine = -1;
                 lineComplexities.clear();
                 continue;
             }
+            previousLineWasCommentOnly = false;
 
             let lineComplexity = 0;
             // TODO: use more metrics
             // Lines of code. Let's use 7 as magical border for increasing complexity by 1 for each line
             // TODO: this includes comment lines, as they don't break sections and this is just start - end
-            lineComplexity += Math.min(1, ((currentLine + 1) - currentSectionStartLine) / 7);
+            const distanceToStartComplexity = Math.min(1, ((currentLine + 1) - currentSectionStartLine) / 7);
 
             // Compare complexity here before adding any block/child related complexities,
             // as I want to catch complex lines in themselves and not nearly everything that has
@@ -153,39 +155,41 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
                 lineComplexity += blockComplexity;
             }
 
+            lineComplexities.add({line: currentLine, complexity: lineComplexity});
+            lineComplexity += distanceToStartComplexity;
             sectionComplexity += lineComplexity;
             totalComplexity += lineComplexity;
-            lineComplexities.add({line: currentLine, complexity: lineComplexity});
 
             if (sourceMap.isBlockStartingInLine(currentLine)) {
                 const blockNode = sourceMap.getBlockStartingInLine(currentLine);
                 currentLine = ts.getLineAndCharacterOfPosition(sourceMap.sourceFile, blockNode.getEnd()).line;
             }
         }
-        if (sectionComplexities.isEmpty()) {
-            sectionComplexities.add({line: currentSectionStartLine, complexity: sectionComplexity});
-        }
+        // if (sectionComplexities.isEmpty()) {
+        //     sectionComplexities.add({line: currentSectionStartLine, complexity: sectionComplexity});
+        // }
         // require comments for complex sections, but only if there is more than one section in a function
-        const didAdd = false;
+        let didAdd = false;
         if (sectionComplexities.size() > 1) {
-            this.enforceCommentRequirementForSection(sectionComplexity, currentSectionStartLine,
-                sectionComplexityThreshold, sourceMap, lineComplexities);
+            didAdd = this.enforceCommentRequirementForSection(sectionComplexity, sectionComplexityThreshold,
+                    currentSectionStartLine, sourceMap, lineComplexities, lineComplexityThreshold);
         }
         if (!didAdd) {
-            this.enforceCommentRequirementForSection(totalComplexity, startLine,
-                    nodeTotalComplexityThreshold, sourceMap, sectionComplexities);
+            didAdd = this.enforceCommentRequirementForSection(totalComplexity, nodeTotalComplexityThreshold,
+                    startLine, sourceMap, sectionComplexities, sectionComplexityThreshold);
         }
         return totalComplexity;
     }
 
-    private enforceCommentRequirementForSection(complexity: number, sectionStartLine: number,
-                                                threshold: number, sourceMap: SourceMap,
-                                                lineComplexities: PriorityQueue<ILineComplexity>) {
+    private enforceCommentRequirementForSection(complexity: number, threshold: number,
+                                                sectionStartLine: number, sourceMap: SourceMap,
+                                                lineComplexities: PriorityQueue<ILineComplexity>,
+                                                lineThreshold: number) {
         if (complexity > threshold) {
             if (!this.requireCommentForLine(sectionStartLine, sourceMap, "sectionstart: " + complexity)) {
                 const findCommentRequirementLocation = (): boolean => {
                     const highestComplexity = lineComplexities.dequeue();
-                    if (highestComplexity === undefined) { return true; }
+                    if (!highestComplexity || highestComplexity.complexity < lineThreshold) { return true; }
                     const reason = "most complex: " + highestComplexity.complexity + " - total: " + complexity;
                     return this.requireCommentForLine(highestComplexity.line, sourceMap, reason);
                 };
