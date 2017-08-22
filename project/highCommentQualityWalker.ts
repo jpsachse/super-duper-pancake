@@ -211,6 +211,10 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
      */
     private requireCommentForLine(line: number, sourceMap: SourceMap, failureMessage?: string): boolean {
         // TODO: don't add another requirement instead of using an array if already present
+        const enclosingNode = sourceMap.getMostEnclosingNodeForLine(line);
+        if (enclosingNode) {
+            line = sourceMap.sourceFile.getLineAndCharacterOfPosition(enclosingNode.getStart()).line;
+        }
         const correspondingComments = sourceMap.getCommentsBelongingToLine(line);
         failureMessage = failureMessage || "This line should be commented";
         // TODO: check meaningfulness of comments instead of just plain existence
