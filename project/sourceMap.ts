@@ -5,6 +5,11 @@ import { IMetricCollector, SourcePart } from "./commentClassificationTypes";
 import { SourceComment } from "./sourceComment";
 import Utils from "./utils";
 
+export interface ISourceCommentDistance {
+    comment: SourceComment;
+    distance: number;
+}
+
 export class SourceMap {
 
     private nodesOfLine = new Map<number, SourcePart[]>();
@@ -167,6 +172,23 @@ export class SourceMap {
 
     public isBlockEndingInLine(line: number): boolean {
         return this.blockEnds.has(line);
+    }
+
+    public getCommentsWithDistanceClosestToLine(line: number): ISourceCommentDistance[] {
+        let i = 0;
+        while (i < this.mergedComments.length &&
+                this.sourceFile.getLineAndCharacterOfPosition(this.mergedComments[i].end).line <= line) {
+            i++;
+        }
+        if (i === 0) {
+            return [];
+        }
+        const commentLine = this.sourceFile.getLineAndCharacterOfPosition(this.mergedComments[i - 1].end).line;
+        const correspondingComments = this.getCommentsBelongingToLine(commentLine + 1);
+        return correspondingComments.map<ISourceCommentDistance>((comment): ISourceCommentDistance => {
+            const distance = line - this.sourceFile.getLineAndCharacterOfPosition(comment.end).line;
+            return {comment, distance};
+        });
     }
 
     public getCommentsBelongingToNode(node: ts.Node): SourceComment[] {

@@ -1,11 +1,10 @@
-import { ICommentAnnotator } from "./commentClassificationTypes";
-import { CommentClass, ICommentClassification, SourceComment } from "./sourceComment";
+import { ICommentClassification } from "./commentClassificationTypes";
+import { CommentClass, SourceComment } from "./sourceComment";
 
-export abstract class CodeDetector implements ICommentAnnotator {
+export abstract class CodeDetector {
     protected NOTE_TEXT = "Code should not be part of a comment";
-    // protected classification: ICommentClassification = {  };
     constructor(protected ruleLocation?: string) {}
-    public abstract annotate(comment: SourceComment);
+    public abstract classify(comment: SourceComment): ICommentClassification[];
 
     get defaultClassification(): ICommentClassification {
         return this.classification();

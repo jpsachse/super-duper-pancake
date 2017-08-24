@@ -1,10 +1,12 @@
 import * as Lint from "tslint";
 import { CodeDetector } from "./codeDetector";
-import { CommentClass, ICommentClassification, SourceComment } from "./sourceComment";
+import { ICommentClassification } from "./commentClassificationTypes";
+import { CommentClass, SourceComment } from "./sourceComment";
 
 export class ExistingRuleBasedCodeDetector extends CodeDetector {
 
-    public annotate(comment: SourceComment) {
+    public classify(comment: SourceComment): ICommentClassification[] {
+        const classifications: ICommentClassification[] = [];
         const linter = this.setupLinter();
         const configuration = this.getLintConfiguration();
         const lines: number[] = [];
@@ -23,10 +25,11 @@ export class ExistingRuleBasedCodeDetector extends CodeDetector {
         });
         if (lines.length === 0) { return; }
         if (lines.length < commentLines.length) {
-            comment.classifications.push(this.classification(lines));
+            classifications.push(this.classification(lines));
         } else {
-            comment.classifications.push(this.defaultClassification);
+            classifications.push(this.defaultClassification);
         }
+        return classifications;
 
     }
 

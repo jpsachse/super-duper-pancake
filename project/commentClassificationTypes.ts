@@ -1,10 +1,11 @@
 import * as ts from "typescript";
-import { SourceComment } from "./sourceComment";
+import { CommentClass, SourceComment } from "./sourceComment";
 
 export type SourcePart = ts.Node | SourceComment;
 
-export interface ICommentAnnotator {
-    annotate(comment: SourceComment);
+export interface ICommentClassification {
+    commentClass: CommentClass;
+    lines?: number[];
 }
 
 export interface IMetricCollector {

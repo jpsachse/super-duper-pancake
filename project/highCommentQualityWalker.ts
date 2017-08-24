@@ -2,8 +2,9 @@ import Stack from "ts-data.stack";
 import * as Lint from "tslint";
 import * as ts from "typescript";
 import { PriorityQueue } from "typescript-collections";
+import { ICommentClassification } from "./commentClassificationTypes";
 import { CommentClassifier } from "./commentClassifier";
-import CommentQualityEvaluator from "./commentQualityEvaluator";
+import { CommentQuality, CommentQualityEvaluator} from "./commentQualityEvaluator";
 import { CustomCodeDetector } from "./customCodeDetector";
 import { ExistingRuleBasedCodeDetector } from "./existingRuleBasedCodeDetector";
 // tslint:disable-next-line:max-line-length
@@ -24,6 +25,11 @@ interface ILineComplexity {
     complexity: number;
 }
 
+interface ICommentStatistics {
+    quality: CommentQuality;
+    classifications: ICommentClassification[];
+}
+
 export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
 
     // lines that should have a comment, mapped to the string representing the reason
@@ -33,6 +39,8 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
     private ccCollector = new CyclomaticComplexityCollector();
     private nestingLevelCollector = new NestingLevelCollector();
     private halsteadCollector = new HalsteadCollector();
+    private commentQualityEvaluator = new CommentQualityEvaluator();
+    private commentStats = new Map<SourceComment, ICommentStatistics>();
 
     public walk(sourceFile: ts.SourceFile) {
         // this.printForEachChild(sourceFile);
@@ -48,8 +56,10 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
         const classifier = new CommentClassifier(codeDetector, sourceMap);
 
         sourceMap.getAllComments().forEach((commentGroup) => {
-            classifier.classify(commentGroup);
-            commentGroup.classifications.forEach( (classification, index) => {
+            const classifications = classifier.classify(commentGroup);
+            const quality = this.commentQualityEvaluator.evaluateQuality(commentGroup, classifications, sourceMap);
+            this.commentStats.set(commentGroup, {classifications, quality});
+            classifications.forEach( (classification, index) => {
                 switch (classification.commentClass) {
                     case CommentClass.Code: {
                         this.addFailureForClassification(commentGroup, index);
@@ -216,6 +226,7 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
             line = sourceMap.sourceFile.getLineAndCharacterOfPosition(enclosingNode.getStart()).line;
         }
         const correspondingComments = sourceMap.getCommentsBelongingToLine(line);
+        const nearestComments = sourceMap.getCommentsWithDistanceClosestToLine(line);
         failureMessage = failureMessage || "This line should be commented";
         // TODO: check meaningfulness of comments instead of just plain existence
         if (correspondingComments.length === 0) {
@@ -257,7 +268,7 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
     }
 
     private addFailureForClassification(comment: SourceComment, classificationIndex: number) {
-        const classification = comment.classifications[classificationIndex];
+        const classification = this.commentStats.get(comment).classifications[classificationIndex];
         const failureMessage = this.getFailureMessage(classification.commentClass);
         if (classification.lines === undefined) {
             const pos = comment.pos;

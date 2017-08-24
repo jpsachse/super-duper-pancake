@@ -1,24 +1,26 @@
-import { ICommentAnnotator } from "./commentClassificationTypes";
+import { ICommentClassification } from "./commentClassificationTypes";
 import { CommentClass, SourceComment } from "./sourceComment";
 import Utils from "./utils";
 
 /**
  * Matches licenses listed at https://choosealicense.com/appendix/
  */
-export class LicenseMatcher implements ICommentAnnotator {
+export class LicenseMatcher {
     private customLicenseRegexp: RegExp;
     private generalLicenseRegexp: RegExp;
 
-    public annotate(comment: SourceComment) {
+    public classify(comment: SourceComment): ICommentClassification[] {
+        const classifications: ICommentClassification[] = [];
         const text = comment.getSanitizedCommentText().text;
         const specificMatches = text.match(this.getOrBuildCustomLicenseRegexp());
         const generalMatches = text.match(this.getOrBuildGeneralLicenseRegexp());
         const isLicenseText = generalMatches !== null &&
-            (specificMatches !== null && specificMatches.length > 0 && generalMatches.length >= 0 ||
-                generalMatches.length > 1);
+            (specificMatches !== null && specificMatches.length > 0 && generalMatches.length >= 0
+                || generalMatches.length > 1);
         if (isLicenseText) {
-            comment.classifications.push({commentClass: CommentClass.Copyright});
+            classifications.push({commentClass: CommentClass.Copyright});
         }
+        return classifications;
     }
 
     private getOrBuildCustomLicenseRegexp(): RegExp {

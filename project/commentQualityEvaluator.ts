@@ -1,5 +1,6 @@
 import * as ts from "typescript";
-import { CommentClass, ICommentClassification, ICommentPart, SourceComment } from "./sourceComment";
+import { ICommentClassification } from "./commentClassificationTypes";
+import { CommentClass, ICommentPart, SourceComment } from "./sourceComment";
 import { SourceMap } from "./sourceMap";
 import Utils from "./utils";
 
@@ -11,14 +12,16 @@ export enum CommentQuality {
     High,
 }
 
-export default class CommentQualityEvaluator {
+export class CommentQualityEvaluator {
 
-    public evaluateQuality(comment: SourceComment, sourceMap: SourceMap): CommentQuality {
+    public evaluateQuality(comment: SourceComment,
+                           classifications: ICommentClassification[],
+                           sourceMap: SourceMap): CommentQuality {
         const pureCodeComment = (classification: ICommentClassification): boolean => {
             return classification.lines === undefined &&
                     classification.commentClass === CommentClass.Code;
         };
-        if (comment.classifications.find(pureCodeComment)) {
+        if (classifications.find(pureCodeComment)) {
             return CommentQuality.Unhelpful;
         }
         const commentEndLine = sourceMap.sourceFile.getLineAndCharacterOfPosition(comment.end).line;

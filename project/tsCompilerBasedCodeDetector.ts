@@ -1,12 +1,14 @@
 import * as ts from "typescript";
 import { CodeDetector } from "./codeDetector";
+import { ICommentClassification } from "./commentClassificationTypes";
 import { CommentClass, SourceComment } from "./sourceComment";
 import Utils from "./utils";
 
 export class TsCompilerBasedCodeDetector extends CodeDetector {
 
     // based on https://gist.github.com/teppeis/6e0f2d823a94de4ae442
-    public annotate(comment: SourceComment) {
+    public classify(comment: SourceComment): ICommentClassification[] {
+        const classifications: ICommentClassification[] = [];
         const lines: number[] = [];
         let commentText: string;
         const compilerOptions: ts.CompilerOptions = {};
@@ -40,7 +42,7 @@ export class TsCompilerBasedCodeDetector extends CodeDetector {
                     const errors = this.getSyntacticErrors(compilerOptions, compilerHost);
                     if (errors.length === 0) {
                         if (start === 0 && end === commentLines.length - 1) {
-                            comment.classifications.push(this.defaultClassification);
+                            classifications.push(this.defaultClassification);
                             return;
                         }
                         lines.push(...Utils.createRange(start, end));
@@ -56,8 +58,9 @@ export class TsCompilerBasedCodeDetector extends CodeDetector {
         if (lines.length > 0) {
             const classification = this.defaultClassification;
             classification.lines = lines;
-            comment.classifications.push(classification);
+            classifications.push(classification);
         }
+        return classifications;
     }
 
     private getSyntacticErrors(compilerOptions: ts.CompilerOptions,

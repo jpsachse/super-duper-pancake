@@ -17,14 +17,8 @@ export interface ICommentPart {
     text: string;
 }
 
-export interface ICommentClassification {
-    commentClass: CommentClass;
-    lines?: number[];
-}
-
 export class SourceComment implements TextRange {
 
-    public classifications: ICommentClassification[] = [];
     private commentParts: ICommentPart[] = [];
 
     constructor(pos: number, end: number, text: string) {
