@@ -42,8 +42,7 @@ export class TsCompilerBasedCodeDetector extends CodeDetector {
                     const errors = this.getSyntacticErrors(compilerOptions, compilerHost);
                     if (errors.length === 0) {
                         if (start === 0 && end === commentLines.length - 1) {
-                            classifications.push(this.defaultClassification);
-                            return;
+                            return [this.defaultClassification];
                         }
                         lines.push(...Utils.createRange(start, end));
                         start = end;

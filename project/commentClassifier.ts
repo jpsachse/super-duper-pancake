@@ -65,8 +65,8 @@ export class CommentClassifier {
         }
         // Should also take position inside the file into account, i.e., most licenses
         // are at the beginning of a file and not somewhere in the middle.
-        classifications.concat(...this.licenseMatcher.classify(comment));
-        classifications.concat(...this.codeDetector.classify(comment));
+        classifications.push(...this.licenseMatcher.classify(comment));
+        classifications.push(...this.codeDetector.classify(comment));
         return classifications;
     }
 

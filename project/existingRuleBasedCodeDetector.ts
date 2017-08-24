@@ -23,7 +23,7 @@ export class ExistingRuleBasedCodeDetector extends CodeDetector {
                 lines.push(index);
             }
         });
-        if (lines.length === 0) { return; }
+        if (lines.length === 0) { return classifications; }
         if (lines.length < commentLines.length) {
             classifications.push(this.classification(lines));
         } else {

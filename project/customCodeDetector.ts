@@ -26,7 +26,7 @@ export class CustomCodeDetector extends CodeDetector {
             }
         });
         if (lines.length === 0) {
-            return;
+            return classifications;
         }
         if (lines.length < commentLines.length) {
             classifications.push(this.classification(lines));
