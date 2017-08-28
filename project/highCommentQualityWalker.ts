@@ -221,7 +221,7 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
      * Add a failure to the given line if it doesn't have a meaningful comment yet.
      * @param line The line that should be commented
      * @param sourceMap The SourceMap in which the line is located
-     * @param sourceFile The SourceFile in which the line is located
+     * @param failureMessage An optional message to be used upon failure
      * @returns {boolean} true if a failure has been added, false if this line already has a comment
      */
     private requireCommentForLine(line: number, sourceMap: SourceMap, failureMessage?: string): boolean {
@@ -230,11 +230,16 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
         if (enclosingNode) {
             line = sourceMap.sourceFile.getLineAndCharacterOfPosition(enclosingNode.getStart()).line;
         }
-        const correspondingComments = sourceMap.getCommentsBelongingToLine(line);
+        // const correspondingComments = sourceMap.getCommentsBelongingToLine(line);
         const nearestComments = sourceMap.getCommentsWithDistanceClosestToLine(line);
-        failureMessage = failureMessage || "This line should be commented";
-        // TODO: check meaningfulness of comments instead of just plain existence
-        if (correspondingComments.length === 0) {
+        const commentStats = this.commentStats;
+        const qualityCommentPresent = nearestComments.some((commentDistance) => {
+            const stats = commentStats.get(commentDistance.comment);
+            return stats.quality > CommentQuality.Low &&
+                commentDistance.distance <= stats.quality - CommentQuality.Low + 1;
+        });
+        if (!qualityCommentPresent) {
+            failureMessage = failureMessage || "This line should be commented";
             if (this.requiredCommentLines.has(line)) {
                 this.requiredCommentLines.get(line).push(failureMessage);
                 // TODO: this is here to allow multiple requirements per line during development
