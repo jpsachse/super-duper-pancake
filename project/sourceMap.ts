@@ -221,14 +221,21 @@ export class SourceMap {
         let previousLineWasTrailing = false;
         TSUtils.forEachComment(sourceFile, (fullText, {kind, pos, end}) => {
             currentCommentStartLine = ts.getLineAndCharacterOfPosition(sourceFile, pos).line;
+            const nodes = this.nodesOfLine.get(currentCommentStartLine);
+            const jsDoc = nodes.filter((node) => {
+                if (Utils.isNode(node)) {
+                    return node.kind === ts.SyntaxKind.JSDocComment && node.pos === pos;
+                }
+                return false;
+            }) as ts.JSDoc[];
             const commentOnlyLineRegxp = /^\s*(\/\/|\/\*)/gm;
             const currentLineText = sourceLines[currentCommentStartLine];
             const isTrailingComment = !currentLineText.match(commentOnlyLineRegxp);
             if (previousLineWasTrailing || isTrailingComment ||
                     previousCommentEndLine === -1 || currentCommentStartLine > previousCommentEndLine + 1) {
-                result.push(new SourceComment(pos, end, fullText.substring(pos, end)));
+                result.push(new SourceComment(pos, end, fullText.substring(pos, end), jsDoc));
             } else if (currentCommentStartLine === previousCommentEndLine + 1) {
-                result[result.length - 1].addPart(pos, end, fullText.substring(pos, end));
+                result[result.length - 1].addPart(pos, end, fullText.substring(pos, end), jsDoc);
             }
             previousCommentEndLine = ts.getLineAndCharacterOfPosition(sourceFile, end).line;
             previousLineWasTrailing = isTrailingComment;

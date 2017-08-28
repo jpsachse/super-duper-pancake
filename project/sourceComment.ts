@@ -1,4 +1,5 @@
-import { TextRange } from "typescript";
+import { JSDoc, TextRange } from "typescript";
+import Utils from "./utils";
 
 export enum CommentClass {
     Copyright,
@@ -15,18 +16,19 @@ export interface ICommentPart {
     pos: number;
     end: number;
     text: string;
+    jsDoc: JSDoc[];
 }
 
 export class SourceComment implements TextRange {
 
     private commentParts: ICommentPart[] = [];
 
-    constructor(pos: number, end: number, text: string) {
-        this.addPart(pos, end, text);
+    constructor(pos: number, end: number, text: string, jsDoc: JSDoc[]) {
+        this.addPart(pos, end, text, jsDoc);
     }
 
-    public addPart(pos: number, end: number, text: string) {
-        this.commentParts.push({pos, end, text: text.replace(/\r\n/g, "\n")});
+    public addPart(pos: number, end: number, text: string, jsDoc: JSDoc[]) {
+        this.commentParts.push({pos, end, text: text.replace(/\r\n/g, "\n"), jsDoc});
     }
 
     public getCompleteComment(): ICommentPart {
@@ -34,6 +36,7 @@ export class SourceComment implements TextRange {
         return { end: this.commentParts[this.commentParts.length - 1].end,
             pos: this.commentParts[0].pos,
             text,
+            jsDoc: Utils.flatten(this.commentParts.map((part) => part.jsDoc)),
         };
     }
 
@@ -58,18 +61,19 @@ export class SourceComment implements TextRange {
             const cleansedText = this.stripCommentStartTokens(part.text);
             let pos = part.pos;
             const unsanitizedLines = part.text.split("\n");
-            return cleansedText.split("\n").map( (line, index) => {
+            return cleansedText.split("\n").map( (line, index): ICommentPart => {
                 const lineLength = unsanitizedLines[index].length;
-                const result = { pos,
+                const result: ICommentPart = { pos,
                     end: pos + lineLength,
                     text: line,
+                    jsDoc: part.jsDoc,
                 };
                 // + 1 to include the removed newline character
                 pos += unsanitizedLines[index].length + 1;
                 return result;
             });
         });
-        return [].concat(...sanitizedComments);
+        return Utils.flatten(sanitizedComments);
     }
 
     public getCommentParts(): ICommentPart[] {
