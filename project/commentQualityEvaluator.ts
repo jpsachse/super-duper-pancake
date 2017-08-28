@@ -29,19 +29,112 @@ export class CommentQualityEvaluator {
         if (nextNode === undefined) {
             nextNode = sourceMap.getFirstNodeAfterLine(commentEndLine);
         }
-        if (nextNode !== undefined && Utils.isDeclaration(nextNode)) {
-            // TODO: this has to be refined considerably, e.g., by stripping common fill words (a, this, any, ...)
-            // and also add handling for texts that reference parameters of functions
-            const name = ts.getNameOfDeclaration(nextNode);
-            const nameText = name === undefined ? ts.SyntaxKind[nextNode.kind] : name.getText(sourceMap.sourceFile);
-            const nameParts = Utils.splitIntoNormalizedWords(nameText).sort();
-            const commentWords = Utils.splitIntoNormalizedWords(comment.getSanitizedCommentText().text).sort();
-            const intersection = Utils.getIntersection(nameParts, commentWords);
-            if (intersection.length / commentWords.length > 0.5) {
-                return CommentQuality.Low;
+        if (nextNode !== undefined) {
+            if (Utils.isDeclaration(nextNode)) {
+                return this.assessDeclarationComment(comment, nextNode, sourceMap);
+            } else {
+                return this.assessInlineComment(comment, nextNode, sourceMap);
             }
         }
         return CommentQuality.Unknown;
+    }
+
+    private assessInlineComment(comment: SourceComment, nextNode: ts.Node, sourceMap: SourceMap): CommentQuality {
+        let quality = CommentQuality.Low;
+        quality = this.higherQuality(quality);
+        return quality;
+    }
+
+    private assessDeclarationComment(comment: SourceComment,
+                                     declaration: ts.Declaration,
+                                     sourceMap: SourceMap): CommentQuality {
+        // TODO: this has to be refined considerably, e.g., by stripping common fill words (a, this, any, ...)
+        // and also add handling for texts that reference parameters of functions
+        let quality = CommentQuality.Low;
+        const jsDocs = comment.getCompleteComment().jsDoc;
+        let commentText: string;
+        if (jsDocs.length > 0) {
+            commentText = jsDocs.map((jsDoc) => jsDoc.comment).join("\n");
+            quality = this.assessJSDocComment(jsDocs[jsDocs.length - 1], declaration, quality);
+            // TODO: throw exception when there is more than one associated jsdoc comment
+            // or handle it gracefully by using the longest one
+        } else {
+            commentText = comment.getSanitizedCommentText().text;
+        }
+        const name = ts.getNameOfDeclaration(declaration);
+        const nameText = name === undefined ? ts.SyntaxKind[declaration.kind] : name.getText(sourceMap.sourceFile);
+        quality = this.assessQualityBasedOnName(commentText, nameText, quality);
+        return quality;
+    }
+
+    /**
+     * Assesses the quality and completeness of the JSDoc comment, similar to the valid-jsdoc eslint rule.
+     * For a function, all parameters should be listed and have a comment with more than just being a type
+     * or character name reference (e.g. "@param aString A string").
+     * @param jsDoc The JSDoc object representing the comment
+     * @param declaration The declaration that is being commented
+     * @param quality The quality of the comment, as assessed until the point of calling this method
+     */
+    private assessJSDocComment(jsDoc: ts.JSDoc, declaration: ts.Declaration, quality: CommentQuality): CommentQuality {
+        const test = Utils.capitalize("");
+        const assessParameterCommentQuality = (comment: string, parameter: ts.ParameterDeclaration): CommentQuality => {
+            const typeName = parameter.type.getText();
+            const typedParameterName = parameter.name.getText() + Utils.capitalize(typeName);
+            return this.assessQualityBasedOnName(comment, typedParameterName, CommentQuality.Medium);
+        };
+        const jsDocParameterComments = new Map<string, string>();
+        jsDoc.forEachChild((docChild) => {
+            if (ts.isJSDocParameterTag(docChild)) {
+                jsDocParameterComments.set(docChild.name.getText(), docChild.comment);
+            }
+        });
+        // Lower the comment quality if parameters are missing from the JSDoc
+        let didCommentAllParametersWell = true;
+        declaration.forEachChild((child) => {
+            if (ts.isParameter(child)) {
+                const parameterComment = jsDocParameterComments.get(child.name.getText());
+                let parameterQuality = CommentQuality.Unhelpful;
+                if (parameterComment) {
+                    parameterQuality = assessParameterCommentQuality(parameterComment, child);
+                }
+                if (parameterQuality < CommentQuality.Medium) {
+                    quality = this.lowerQuality(quality);
+                    didCommentAllParametersWell = false;
+                }
+            }
+        });
+        if (didCommentAllParametersWell) {
+            quality = this.higherQuality(quality);
+        }
+        return quality;
+    }
+
+    private assessQualityBasedOnName(comment: string, nodeName: string, quality: CommentQuality): CommentQuality {
+        const commentParts = this.filterCommonWords(Utils.splitIntoNormalizedWords(comment).sort());
+        const nameParts = Utils.splitIntoNormalizedWords(nodeName).sort();
+        const intersection = Utils.getIntersection(nameParts, commentParts);
+        if (intersection.length / commentParts.length > 0.5) {
+            quality = this.lowerQuality(quality);
+        } else {
+            // TODO: more heuristics upon what is good comment text
+            quality = this.higherQuality(quality);
+        }
+        return quality;
+    }
+
+    private filterCommonWords(words: string[]): string[] {
+        // TODO: implement this
+        return words.filter((word) => {
+            return true;
+        });
+    }
+
+    private higherQuality(current: CommentQuality): CommentQuality {
+        return Math.min(current + 1, CommentQuality.High);
+    }
+
+    private lowerQuality(current: CommentQuality): CommentQuality {
+        return Math.max(current - 1, CommentQuality.Unhelpful);
     }
 
 }
