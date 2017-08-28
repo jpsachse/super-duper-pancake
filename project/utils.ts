@@ -82,11 +82,27 @@ export default class Utils {
         return result;
     }
 
+    /**
+     * Splits camelCased text into an array of lowercase words. Works only for standard ASCII characters.
+     * Will also strip basic latin punctuation characters from the words.
+     * @param camelCaseText Text with camelcase words in it. The text will be split along camelCasing and whitespace.
+     */
     public static splitIntoNormalizedWords(camelCaseText: string): string[] {
         return camelCaseText.replace(/([a-z0-9])([A-Z])/g, "$1 $2")
                             .replace(/([A-Z])([A-Z][a-z])/g, "$1 $2")
                             .toLowerCase()
-                            .split(" ");
+                            .split(/\s/)
+                            .map((word) => word.replace(this.basicLatinPunctuation, ""));
     }
+
+    public static flatten(arrayOfArrays: any[][]): any[] {
+        return [].concat(...arrayOfArrays);
+    }
+
+    public static capitalize(aString: string) {
+        return aString.charAt(0).toUpperCase() + aString.slice(1).toLowerCase();
+    }
+
+    private static basicLatinPunctuation = /[\u0021-\u002F\u003A-\u0040\u005B-\u0060\u007B-\u007F]*/g;
 
 }
