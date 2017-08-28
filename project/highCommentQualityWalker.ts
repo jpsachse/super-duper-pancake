@@ -59,10 +59,11 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
             const classifications = classifier.classify(commentGroup);
             const quality = this.commentQualityEvaluator.evaluateQuality(commentGroup, classifications, sourceMap);
             this.commentStats.set(commentGroup, {classifications, quality});
+            // TODO: act on all classifications / quality and add failures for low quality comments
             classifications.forEach( (classification, index) => {
                 switch (classification.commentClass) {
                     case CommentClass.Code: {
-                        this.addFailureForClassification(commentGroup, index);
+                        this.addFailureForClassification(commentGroup, classification);
                         break;
                     }
                     case CommentClass.Copyright:
@@ -79,6 +80,10 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
                         break;
                 }
             });
+            if (quality <= CommentQuality.Low) {
+                const end = sourceFile.getLineEndOfPosition(commentGroup.pos);
+                this.addFailure(commentGroup.pos, end, "Low comment quality: " + CommentQuality[quality]);
+            }
         });
         // TODO: don't pass nested functions here, as they will get handled by their parent
         // Alternative: save nodes / lines for which complexity already has been calculated
@@ -267,8 +272,7 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
         });
     }
 
-    private addFailureForClassification(comment: SourceComment, classificationIndex: number) {
-        const classification = this.commentStats.get(comment).classifications[classificationIndex];
+    private addFailureForClassification(comment: SourceComment, classification: ICommentClassification) {
         const failureMessage = this.getFailureMessage(classification.commentClass);
         if (classification.lines === undefined) {
             const pos = comment.pos;
