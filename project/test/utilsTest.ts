@@ -7,14 +7,12 @@ import Utils from "../utils";
 describe("is node", () => {
     it("should return false for SourceComments", () => {
         const text = "TestComment";
-        const comment = new SourceComment(0, text.length, text);
+        const comment = new SourceComment(0, text.length, text, []);
         const result = Utils.isNode(comment);
         // tslint:disable-next-line:no-unused-expression
         expect(result).to.be.false;
     });
-});
 
-describe("is node", () => {
     it("should return true for Nodes", () => {
         const node = ts.createNode(ts.SyntaxKind.EmptyStatement);
         const result = Utils.isNode(node);
