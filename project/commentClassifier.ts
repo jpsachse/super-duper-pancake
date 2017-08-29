@@ -5,6 +5,7 @@ import { ICommentClassification } from "./commentClassificationTypes";
 import { LicenseMatcher } from "./licenseMatcher";
 import { CommentClass, ICommentPart, SourceComment } from "./sourceComment";
 import { SourceMap } from "./sourceMap";
+import { TaskCommentMatcher } from "./taskCommentMatcher";
 import Utils from "./utils";
 
 import SK = ts.SyntaxKind;
@@ -25,11 +26,10 @@ export class CommentClassifier {
 //   - Code comments
 //   - Task comments
 
-    private licenseMatcher: LicenseMatcher;
+    private licenseMatcher = new LicenseMatcher();
+    private taskCommentMatcher = new TaskCommentMatcher();
 
-    constructor(private codeDetector: CodeDetector, private sourceMap: SourceMap) {
-        this.licenseMatcher = new LicenseMatcher();
-    }
+    constructor(private codeDetector: CodeDetector, private sourceMap: SourceMap) {}
 
     public classify(comment: SourceComment): ICommentClassification[] {
         const commentText = comment.getSanitizedCommentText().text;
@@ -63,10 +63,11 @@ export class CommentClassifier {
                 break;
             }
         }
-        // Should also take position inside the file into account, i.e., most licenses
+        // TODO: Should also take position inside the file into account, i.e., most licenses
         // are at the beginning of a file and not somewhere in the middle.
         classifications.push(...this.licenseMatcher.classify(comment));
         classifications.push(...this.codeDetector.classify(comment));
+        classifications.push(...this.taskCommentMatcher.classify(comment));
         return classifications;
     }
 
