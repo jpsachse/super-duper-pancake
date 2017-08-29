@@ -63,6 +63,7 @@ export class SourceComment implements TextRange {
             const unsanitizedLines = part.text.split("\n");
             return cleansedText.split("\n").map( (line, index): ICommentPart => {
                 const lineLength = unsanitizedLines[index].length;
+                line = line.replace(/\s+$/, "");
                 const result: ICommentPart = { pos,
                     end: pos + lineLength,
                     text: line,
