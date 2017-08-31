@@ -1,14 +1,14 @@
 import { expect } from "chai";
 import "mocha";
 import * as ts from "typescript";
+import { CustomCodeDetector } from "../customCodeDetector";
 import { CommentClass, SourceComment } from "../sourceComment";
-import { TsCompilerBasedCodeDetector } from "../tsCompilerBasedCodeDetector";
 import * as DetectorTestHelper from "./codeDetectorTestHelper";
 
 describe("classify", () => {
-    let codeDetector: TsCompilerBasedCodeDetector;
+    let codeDetector: CustomCodeDetector;
     before(() => {
-        codeDetector = new TsCompilerBasedCodeDetector();
+        codeDetector = new CustomCodeDetector("./comment-classification-rules/no-code");
     });
 
     it("should recognize a simple method call", () => {

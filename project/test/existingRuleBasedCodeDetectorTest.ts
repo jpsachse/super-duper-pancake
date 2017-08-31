@@ -1,14 +1,14 @@
 import { expect } from "chai";
 import "mocha";
 import * as ts from "typescript";
+import { ExistingRuleBasedCodeDetector } from "../existingRuleBasedCodeDetector";
 import { CommentClass, SourceComment } from "../sourceComment";
-import { TsCompilerBasedCodeDetector } from "../tsCompilerBasedCodeDetector";
 import * as DetectorTestHelper from "./codeDetectorTestHelper";
 
 describe("classify", () => {
-    let codeDetector: TsCompilerBasedCodeDetector;
+    let codeDetector: ExistingRuleBasedCodeDetector;
     before(() => {
-        codeDetector = new TsCompilerBasedCodeDetector();
+        codeDetector = new ExistingRuleBasedCodeDetector("./node-modules/tslint/lib/rules");
     });
 
     it("should recognize a simple method call", () => {

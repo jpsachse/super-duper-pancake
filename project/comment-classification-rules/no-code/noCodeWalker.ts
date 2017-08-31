@@ -9,7 +9,6 @@ export class NoCodeWalker extends Lint.AbstractWalker<void> {
         let codeLength = 0;
         const visitNode = (node: ts.Node): void => {
             if (this.isCodeToken(node.kind)) {
-                console.log(node.getText() + ": " + node.kind);
                 codeLength += node.end - node.pos;
                 return;
             }

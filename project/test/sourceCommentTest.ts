@@ -2,23 +2,7 @@ import { expect } from "chai";
 import "mocha";
 import * as ts from "typescript";
 import { CommentClass, SourceComment } from "../sourceComment";
-
-function buildComment(lines?: string[]): SourceComment {
-    if (!lines || lines.length === 0) {
-        return new SourceComment(0, 0, "", []);
-    }
-    let result: SourceComment;
-    let currentPos = 0;
-    lines.forEach((line) => {
-        currentPos += line.length;
-        if (!result) {
-            result = new SourceComment(0, currentPos, line, []);
-        } else {
-            result.addPart(currentPos - line.length, currentPos, line, []);
-        }
-    });
-    return result;
-}
+import { buildComment } from "./testHelper";
 
 describe("get complete comment", () => {
 
@@ -26,11 +10,8 @@ describe("get complete comment", () => {
         const commentTextPart1 = "Hello, world!";
         const commentTextPart2 = "Can't stop, won't stop!";
         const commentTextPart3 = "Precision German engineering!";
-        const allComments = [commentTextPart1, commentTextPart2, commentTextPart3];
-        const comment = buildComment(allComments);
-        const totalLength = allComments.reduce((previous, current) => {
-            return previous + current.length;
-        }, 0);
+        const comment = buildComment(commentTextPart1, commentTextPart2, commentTextPart3);
+        const totalLength = commentTextPart1.length + commentTextPart2.length + commentTextPart3.length;
         const joinedComment = comment.getCompleteComment();
         expect(joinedComment.pos).to.equal(0);
         expect(joinedComment.end).to.equal(totalLength);
@@ -46,7 +27,7 @@ describe("get sanitized lines", () => {
     it("should strip trailing spaces", () => {
         const commentTextPart1 = "Hello, world!   ";
         const commentTextPart2 = "Can't stop, won't stop!   ";
-        const comment = buildComment([commentTextPart1, commentTextPart2]);
+        const comment = buildComment(commentTextPart1, commentTextPart2);
         const lines = comment.getSanitizedCommentLines();
         const expectedResults = ["Hello, world!", "Can't stop, won't stop!"];
         lines.forEach((line, index) => {
