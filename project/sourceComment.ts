@@ -105,14 +105,15 @@ export class SourceComment implements TextRange {
         lines.forEach((line) => {
             if (isMultiLineComment) {
                 // Multiline comment end
-                const position = line.search(/\*\//);
-                if (position >= 0) {
-                    result.push(line.substring(0, position) + line.substring(position + 2));
+                const matchedEnd = line.match(/\s*\*\//);
+                if (matchedEnd && matchedEnd.length >= 0) {
+                    const position = matchedEnd.index;
+                    result.push(line.substring(0, position) + line.substring(position + matchedEnd[0].length));
                     isMultiLineComment = false;
                     return;
                 }
                 // Asterisks from JSDoc-styled comments
-                const leadingAsterisk = /^\s*\*+/;
+                const leadingAsterisk = /^\s*\*+\s*/;
                 const matchedAsterisks = line.match(leadingAsterisk);
                 if (matchedAsterisks && matchedAsterisks.length) {
                     result.push(line.substring(matchedAsterisks[0].length));
@@ -122,7 +123,7 @@ export class SourceComment implements TextRange {
                 return;
             }
             // Multiline comment start
-            const multilineCommentstart = /^\s*\/\*+/;
+            const multilineCommentstart = /^\s*\/\*+\s*/;
             let matchedCommentStarts = line.match(multilineCommentstart);
             if (matchedCommentStarts && matchedCommentStarts.length) {
                 result.push(line.substring(matchedCommentStarts[0].length));
@@ -130,7 +131,7 @@ export class SourceComment implements TextRange {
                 return;
             }
             // Single line comment start
-            const singleLineCommentStart = /^\/\/+/;
+            const singleLineCommentStart = /^\/\/+\s*/;
             matchedCommentStarts = line.match(singleLineCommentStart);
             if (matchedCommentStarts && matchedCommentStarts.length) {
                 result.push(line.substring(matchedCommentStarts[0].length));
