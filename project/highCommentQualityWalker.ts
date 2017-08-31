@@ -59,25 +59,9 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
             const classifications = classifier.classify(commentGroup);
             const quality = this.commentQualityEvaluator.evaluateQuality(commentGroup, classifications, sourceMap);
             this.commentStats.set(commentGroup, {classifications, quality});
-            // TODO: act on all classifications / quality and add failures for low quality comments
             classifications.forEach( (classification, index) => {
-                switch (classification.commentClass) {
-                    case CommentClass.Code: {
-                        this.addFailureForClassification(commentGroup, classification);
-                        break;
-                    }
-                    case CommentClass.Copyright:
-                    case CommentClass.Header:
-                        // Now do something amazing with this information, e.g., decide whether this
-                        // is a good or bad comment.
-                    case CommentClass.Inline:
-                        // Now do something amazing with this information, e.g., decide whether this
-                        // is a good or bad comment.
-                    case CommentClass.Section:
-                    case CommentClass.Task:
-                    case CommentClass.Unknown:
-                    default:
-                        break;
+                if (classification.commentClass === CommentClass.Code) {
+                    this.addFailureForClassification(commentGroup, classification);
                 }
             });
             if (quality <= CommentQuality.Low) {
@@ -97,6 +81,7 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
      * Calculate complexity metric values for each line in the block and add failures at positions
      * that exceed a complexity threshold.
      * @param node The node whose lines should be analyzed
+     * @param sourceMap The source map to be used for finding information
      * @returns {number} The sum of the complexity scores of all lines of code in the node
      */
     private analyze(node: ts.Node, sourceMap: SourceMap): number {
