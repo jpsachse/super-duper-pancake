@@ -34,7 +34,7 @@ export class CommentClassifier {
     public classify(comment: SourceComment): ICommentClassification[] {
         const commentText = comment.getSanitizedCommentText().text;
         const sanitizedLines = comment.getSanitizedCommentLines();
-        const nextNode = this.sourceMap.getNodeFollowing(comment);
+        const nextNode = this.sourceMap.getFirstNodeAfterLineOfNode(comment);
         const classifications: ICommentClassification[] = [];
         if (nextNode) {
             const sourceFile = nextNode.getSourceFile();

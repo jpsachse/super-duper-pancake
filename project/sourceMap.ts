@@ -65,13 +65,6 @@ export class SourceMap {
         return this.functionLikes;
     }
 
-    public getNodeFollowing(node: SourcePart): ts.Node | undefined {
-        const position = this.positionOfNode.get(node);
-        if (!position) { return; }
-        const endingLine = this.sourceFile.getLineAndCharacterOfPosition(position.end).line;
-        return this.getFirstNodeAfterLine(endingLine);
-    }
-
     public getSourcePartBefore(node: SourcePart): SourcePart | undefined {
         const position = this.positionOfNode.get(node);
         if (!position) { return; }
@@ -85,8 +78,15 @@ export class SourceMap {
         return this.getFirstNodeAfterLine(line - 1);
     }
 
+    public getFirstNodeAfterLineOfNode(node: SourcePart): ts.Node | undefined {
+        const position = this.positionOfNode.get(node);
+        if (!position) { return; }
+        const endingLine = this.sourceFile.getLineAndCharacterOfPosition(position.end).line;
+        return this.getFirstNodeAfterLine(endingLine);
+    }
+
     public getFirstNodeAfterLine(line: number): ts.Node | undefined {
-        const nodesSpanningLine = this.nodesOfLine.get(line);
+        const nodesSpanningLine = this.nodesOfLine.get(line) || [];
         const followingNodes = [this.sourceFile as SourcePart].concat(...this.nodesOfLine.get(line + 1));
         if (!followingNodes) { return; }
         let parentBlock: ts.Node;
@@ -94,7 +94,8 @@ export class SourceMap {
         while (i > 0) {
             i--;
             const currentSourcePart = nodesSpanningLine[i];
-            if (Utils.isNode(currentSourcePart) && !ts.isJSDoc(currentSourcePart)) {
+            if (Utils.isNode(currentSourcePart) && TSUtils.isBlockLike(currentSourcePart)
+                    && !ts.isJSDoc(currentSourcePart)) {
                 parentBlock = currentSourcePart;
                 break;
             }
@@ -221,7 +222,7 @@ export class SourceMap {
         let previousLineWasTrailing = false;
         TSUtils.forEachComment(sourceFile, (fullText, {kind, pos, end}) => {
             currentCommentStartLine = ts.getLineAndCharacterOfPosition(sourceFile, pos).line;
-            const nodes = this.nodesOfLine.get(currentCommentStartLine);
+            const nodes = this.nodesOfLine.get(currentCommentStartLine) || [];
             const jsDoc = nodes.filter((node) => {
                 if (Utils.isNode(node)) {
                     return node.kind === ts.SyntaxKind.JSDocComment && node.pos === pos;

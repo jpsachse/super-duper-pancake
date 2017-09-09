@@ -18,10 +18,29 @@
     "@types/mocha": "^2.2.41",
     "chai": "^4.1.0",
     "mocha": "^3.4.2",
+    "nyc": "^11.2.1",
+    "source-map-support": "^0.4.17",
     "ts-node": "^3.2.0"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "nyc mocha"
+  },
+  "nyc": {
+    "extension": [
+      ".ts",
+      ".tsx"
+    ],
+    "exclude": [
+      "**/*.d.ts",
+      "gold_standard/**",
+      "test_files/**",
+      "test/**",
+      "coverage/**"
+    ],
+    "reporter": [
+      "html"
+    ],
+    "all": true
   },
   "author": "Jan Philipp Sachse"
 }
