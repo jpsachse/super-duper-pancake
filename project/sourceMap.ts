@@ -91,14 +91,17 @@ export class SourceMap {
         if (!followingNodes) { return; }
         let parentBlock: ts.Node;
         let i = nodesSpanningLine.length;
+        let didSkipInitialBlockEnding = !this.isBlockEndingInLine(line);
         while (i > 0) {
             i--;
             const currentSourcePart = nodesSpanningLine[i];
             if (Utils.isNode(currentSourcePart) && TSUtils.isBlockLike(currentSourcePart)
-                    && !ts.isJSDoc(currentSourcePart)) {
+                    && didSkipInitialBlockEnding && !ts.isJSDoc(currentSourcePart)) {
                 parentBlock = currentSourcePart;
                 break;
             }
+            didSkipInitialBlockEnding = didSkipInitialBlockEnding ||
+                    (Utils.isNode(currentSourcePart) && TSUtils.isBlockLike(currentSourcePart));
         }
         if (parentBlock === undefined) {
             parentBlock = this.sourceFile;

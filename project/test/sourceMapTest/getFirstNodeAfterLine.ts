@@ -4,3 +4,4 @@ function foo() {
 
     return;
 }
+foo();

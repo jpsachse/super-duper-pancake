@@ -68,6 +68,43 @@ describe("getFirstNodeAfterLine", () => {
 
 });
 
+describe("getFirstNodeAfterLineOfNode", () => {
+
+    it("should return the first node in the next line after a function block", () => {
+        const map = createSourceMap("test/sourceMapTest/getFirstNodeAfterLine.ts");
+        let node = map.getFirstNodeInLine(1);
+        node = map.getFirstNodeAfterLineOfNode(node);
+        expect(node).to.not.equal(undefined);
+        expect(node.kind).to.equal(ts.SyntaxKind.ExpressionStatement);
+        expect((node as ts.ExpressionStatement).expression.kind).to.equal(ts.SyntaxKind.CallExpression);
+    });
+
+    function getLastNodeOfFirstLine(map: SourceMap): ts.Node {
+        return map.getSourcePartBefore(map.getFirstNodeInLine(2)) as ts.Node;
+    }
+
+    it("should return undefined if no node is given", () => {
+        const map = createSourceMap("test/sourceMapTest/getFirstNodeAfterLine.ts");
+        expect(map.getFirstNodeAfterLineOfNode(undefined)).to.equal(undefined);
+    });
+
+    it("should return the first node in the line following the given node", () => {
+        const map = createSourceMap("test/sourceMapTest/getFirstNodeAfterLine.ts");
+        let node = getLastNodeOfFirstLine(map);
+        node = map.getFirstNodeAfterLineOfNode(node);
+        expect(node).to.not.equal(undefined);
+        expect(node.kind).to.equal(ts.SyntaxKind.VariableStatement);
+    });
+
+    it("should return undefined if there is no node in the next line", () => {
+        const map = createSourceMap("test/sourceMapTest/getFirstNodeAfterLine.ts");
+        let node = map.getFirstNodeInLine(2);
+        node = map.getFirstNodeAfterLineOfNode(node);
+        expect(node).to.equal(undefined);
+    });
+
+});
+
 describe("getFirstNodeInLine", () => {
 
     it("should return the first node in the requested line", () => {
@@ -81,6 +118,12 @@ describe("getFirstNodeInLine", () => {
         node = map.getFirstNodeInLine(4);
         expect(node).to.not.equal(undefined);
         expect(node.kind).to.equal(ts.SyntaxKind.ReturnStatement);
+    });
+
+    it("should return undefined if there is no node in the line", () => {
+        const map = createSourceMap("test/sourceMapTest/getFirstNodeAfterLine.ts");
+        const node = map.getFirstNodeInLine(3);
+        expect(node).to.equal(undefined);
     });
 
 });
