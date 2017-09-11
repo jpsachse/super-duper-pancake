@@ -4,7 +4,9 @@
       "**/.DS_Store": true,
       "**/*.js": { "when": "$(basename).ts" },
       "**/*.js.map": true,
-      "node_modules/**": true
+      "node_modules/**": true,
+      ".nyc_output/**": true,
+      "coverage/**": true
     },
     "editor.rulers": [100],
     "files.trimTrailingWhitespace": true
