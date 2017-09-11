@@ -32,7 +32,7 @@ export class SourceMap {
                 if (ts.isFunctionLike(nodeOrComment)) {
                     this.functionLikes.push(nodeOrComment);
                 }
-                if (ts.isBlock(nodeOrComment)) {
+                if (ts.isBlock(nodeOrComment) && !this.blockStarts.has(startLine)) {
                     this.blockStarts.set(startLine, nodeOrComment);
                     this.blockEnds.set(endLine, nodeOrComment);
                 }

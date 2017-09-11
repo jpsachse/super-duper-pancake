@@ -147,3 +147,101 @@ describe("getSourcePartBefore", () => {
     });
 
 });
+
+describe("getMostEnclosingNodeForLine", () => {
+
+    it("should return the first statement of several chained ones", () => {
+        const map = createSourceMap("test/sourceMapTest/getMostEnclosingNodeForLine.ts");
+        const node = map.getMostEnclosingNodeForLine(1);
+        expect(node).to.not.equal(undefined);
+        expect(node.kind).to.equal(ts.SyntaxKind.ExpressionStatement);
+        const lineAndChar = map.sourceFile.getLineAndCharacterOfPosition(node.getStart());
+        expect(lineAndChar.character).to.equal(0);
+        expect(lineAndChar.line).to.equal(1);
+    });
+
+    it("should return undefined for an empty line", () => {
+        const map = createSourceMap("test/sourceMapTest/getMostEnclosingNodeForLine.ts");
+        const node = map.getMostEnclosingNodeForLine(0);
+        expect(node).to.equal(undefined);
+    });
+
+    it("should return undefined for an empty line in a block", () => {
+        const map = createSourceMap("test/sourceMapTest/getMostEnclosingNodeForLine.ts");
+        const node = map.getMostEnclosingNodeForLine(4);
+        expect(node).to.equal(undefined);
+    });
+
+});
+
+describe("isBlockStartingInLine", () => {
+
+    it("should  return true if a block starts in the line", () => {
+        const map = createSourceMap("test/sourceMapTest/blockStarts.ts");
+        // tslint:disable:no-unused-expression
+        expect(map.isBlockStartingInLine(3)).to.be.true;
+        expect(map.isBlockStartingInLine(5)).to.be.true;
+        // tslint:enable:no-unused-expression
+    });
+
+    it("should return false if no block starts in the line", () => {
+        const map = createSourceMap("test/sourceMapTest/blockStarts.ts");
+        // tslint:disable:no-unused-expression
+        expect(map.isBlockStartingInLine(2)).to.be.false;
+        expect(map.isBlockStartingInLine(6)).to.be.false;
+        // tslint:enable:no-unused-expression
+    });
+
+});
+
+describe("getBlockStartingInLine", () => {
+
+    it("should return a block if it starts in the line", () => {
+        const map = createSourceMap("test/sourceMapTest/blockStarts.ts");
+        expect(map.getBlockStartingInLine(3)).to.not.equal(undefined);
+    });
+
+    it("should return undefined if no block starts in the line", () => {
+        const map = createSourceMap("test/sourceMapTest/blockStarts.ts");
+        expect(map.getBlockStartingInLine(2)).to.equal(undefined);
+    });
+
+    it("should return the first block that starts in a line", () => {
+        const map = createSourceMap("test/sourceMapTest/blockStarts.ts");
+        const startedBlock = map.getBlockStartingInLine(5);
+        const lineAndChar = map.sourceFile.getLineAndCharacterOfPosition(startedBlock.getStart());
+        expect(lineAndChar.line).to.equal(5);
+        expect(lineAndChar.character).to.equal(26);
+    });
+
+});
+
+describe("getCommentsWithDistanceClosestToLine", () => {
+
+    it("should return the closest comment not after the line with the corrensponding distance", () => {
+        const map = createSourceMap("test/sourceMapTest/lineComments.ts");
+        const comments = map.getCommentsWithDistanceClosestToLine(6);
+        expect(comments.length).to.equal(1);
+        const commentDistance = comments[0];
+        expect(commentDistance.distance).to.equal(1);
+        const expectedText = "This is commenting the return statement.";
+        expect(commentDistance.comment.getSanitizedCommentText().text).to.equal(expectedText);
+    });
+
+    it("should return a comment in the same line", () => {
+        const map = createSourceMap("test/sourceMapTest/lineComments.ts");
+        const comments = map.getCommentsWithDistanceClosestToLine(5);
+        expect(comments.length).to.equal(1);
+        const commentDistance = comments[0];
+        expect(commentDistance.distance).to.equal(0);
+        const expectedText = "This is commenting the return statement.";
+        expect(commentDistance.comment.getSanitizedCommentText().text).to.equal(expectedText);
+    });
+
+    it("should return an empty array if there are no comments before the line", () => {
+        const map = createSourceMap("test/sourceMapTest/lineComments.ts");
+        const comments = map.getCommentsWithDistanceClosestToLine(0);
+        expect(comments.length).to.equal(0);
+    });
+
+});
