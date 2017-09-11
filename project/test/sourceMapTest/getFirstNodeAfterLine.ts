@@ -5,3 +5,10 @@ function foo() {
     return;
 }
 foo();
+
+class FooBar {
+
+    private test: string;
+    private this: number;
+
+}

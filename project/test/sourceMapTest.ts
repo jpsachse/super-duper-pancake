@@ -103,6 +103,14 @@ describe("getFirstNodeAfterLineOfNode", () => {
         expect(node).to.equal(undefined);
     });
 
+    it("should return the first node in the next line in a class environment", () => {
+        const map = createSourceMap("test/sourceMapTest/getFirstNodeAfterLine.ts");
+        let node = map.getFirstNodeInLine(10);
+        node = map.getFirstNodeAfterLineOfNode(node);
+        expect(node).to.not.equal(undefined);
+        expect(node.kind).to.equal(ts.SyntaxKind.PropertyDeclaration);
+    });
+
 });
 
 describe("getFirstNodeInLine", () => {

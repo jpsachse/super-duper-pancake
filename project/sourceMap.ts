@@ -95,9 +95,10 @@ export class SourceMap {
         while (i > 0) {
             i--;
             const currentSourcePart = nodesSpanningLine[i];
-            if (Utils.isNode(currentSourcePart) && TSUtils.isBlockLike(currentSourcePart)
-                    && didSkipInitialBlockEnding && !ts.isJSDoc(currentSourcePart)) {
-                parentBlock = currentSourcePart;
+            const isBlockOrClass = Utils.isNode(currentSourcePart) && !ts.isJSDoc(currentSourcePart) &&
+                    (TSUtils.isBlockLike(currentSourcePart) || ts.isClassLike(currentSourcePart));
+            if (isBlockOrClass && didSkipInitialBlockEnding) {
+                parentBlock = currentSourcePart as ts.Node;
                 break;
             }
             didSkipInitialBlockEnding = didSkipInitialBlockEnding ||
