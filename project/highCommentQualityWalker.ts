@@ -5,8 +5,6 @@ import { PriorityQueue } from "typescript-collections";
 import { ICommentClassification } from "./commentClassificationTypes";
 import { CommentClassifier } from "./commentClassifier";
 import { CommentQuality, CommentQualityEvaluator} from "./commentQualityEvaluator";
-import { CustomCodeDetector } from "./customCodeDetector";
-import { ExistingRuleBasedCodeDetector } from "./existingRuleBasedCodeDetector";
 // tslint:disable-next-line:max-line-length
 import { CyclomaticComplexityCollector, HalsteadCollector, LinesOfCodeCollector, NestingLevelCollector } from "./metricCollectors";
 import { CommentClass, SourceComment } from "./sourceComment";
@@ -193,9 +191,8 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
                     const reason = "most complex: " + highestComplexity.complexity + " - total: " + complexity;
                     return this.requireCommentForLine(highestComplexity.line, sourceMap, reason);
                 };
-                while (true) {
-                    if (findCommentRequirementLocation()) { break; }
-                }
+                // tslint:disable-next-line:no-empty
+                while (!findCommentRequirementLocation()) {}
             }
             return true;
         }
