@@ -12,7 +12,7 @@
             "stopOnEntry": false,
             "args": [ "${workspaceRoot}/test_files/lintThis.ts" ],
             "cwd": "${workspaceRoot}",
-            "preLaunchTask": "tsc",
+            "preLaunchTask": "build",
             "runtimeExecutable": null,
             "runtimeArgs": [
                 "--nolazy"
