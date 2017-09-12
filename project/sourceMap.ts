@@ -238,7 +238,7 @@ export class SourceMap {
             const isTrailingComment = !currentLineText.match(commentOnlyLineRegxp);
             if (previousLineWasTrailing || isTrailingComment ||
                     previousCommentEndLine === -1 || currentCommentStartLine > previousCommentEndLine + 1) {
-                result.push(new SourceComment(pos, end, fullText.substring(pos, end), jsDoc));
+                result.push(new SourceComment(pos, end, fullText.substring(pos, end), jsDoc, isTrailingComment));
             } else if (currentCommentStartLine === previousCommentEndLine + 1) {
                 result[result.length - 1].addPart(pos, end, fullText.substring(pos, end), jsDoc);
             }

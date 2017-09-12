@@ -23,7 +23,7 @@ export class SourceComment implements TextRange {
 
     private commentParts: ICommentPart[] = [];
 
-    constructor(pos: number, end: number, text: string, jsDoc: JSDoc[]) {
+    constructor(pos: number, end: number, text: string, jsDoc: JSDoc[], private trailing: boolean = false) {
         this.addPart(pos, end, text, jsDoc);
     }
 
@@ -87,6 +87,10 @@ export class SourceComment implements TextRange {
 
     public getEndOfLine(line: number): number {
         return this.getSanitizedCommentLines()[line].end;
+    }
+
+    get isTrailing(): boolean {
+        return this.trailing;
     }
 
     get pos(): number {

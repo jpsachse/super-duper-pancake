@@ -1,17 +1,9 @@
 import { expect } from "chai";
-import { readFileSync } from "fs";
 import "mocha";
 import * as ts from "typescript";
 import { SourceMap } from "../sourceMap";
 import Utils from "../utils";
-
-function createSourceMap(fileName: string): SourceMap {
-    const sourceFile = ts.createSourceFile(fileName,
-                                           readFileSync(fileName).toString(),
-                                           ts.ScriptTarget.Latest,
-                                           true);
-    return new SourceMap(sourceFile, []);
-}
+import { createSourceMap } from "./testHelper";
 
 describe("getAllFunctionLikes", () => {
 

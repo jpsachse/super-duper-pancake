@@ -1,4 +1,7 @@
+import { readFileSync } from "fs";
+import * as ts from "typescript";
 import { SourceComment } from "../sourceComment";
+import { SourceMap } from "../sourceMap";
 
 export function buildComment(...lines: string[]): SourceComment {
     if (!lines || lines.length === 0) {
@@ -15,4 +18,12 @@ export function buildComment(...lines: string[]): SourceComment {
         }
     });
     return result;
+}
+
+export function createSourceMap(fileName: string): SourceMap {
+    const sourceFile = ts.createSourceFile(fileName,
+                                           readFileSync(fileName).toString(),
+                                           ts.ScriptTarget.Latest,
+                                           true);
+    return new SourceMap(sourceFile, []);
 }

@@ -34,12 +34,24 @@ export class CommentClassifier {
     public classify(comment: SourceComment): ICommentClassification[] {
         const commentText = comment.getSanitizedCommentText().text;
         const sanitizedLines = comment.getSanitizedCommentLines();
-        const nextNode = this.sourceMap.getFirstNodeAfterLineOfNode(comment);
+        const commentLine = this.sourceMap.sourceFile.getLineAndCharacterOfPosition(comment.end).line;
+        const nodeLine = comment.isTrailing ? commentLine : commentLine + 1;
+        const nextNode = this.sourceMap.getMostEnclosingNodeForLine(nodeLine);
         const classifications: ICommentClassification[] = [];
-        if (nextNode) {
+        const enclosingNodes = this.sourceMap.getEnclosingNodes(comment);
+
+        for (const parentNode of enclosingNodes) {
+            if (parentNode && ts.isFunctionLike(parentNode)) {
+                classifications.push({commentClass: CommentClass.Inline});
+                break;
+            }
+        }
+
+        if (classifications.length === 0 && nextNode) {
             const sourceFile = nextNode.getSourceFile();
-            // Check for a function start
-            if (ts.isFunctionLike(nextNode) || ts.isFunctionLike(nextNode.parent)) {
+            // Check for a function or class start
+            if (ts.isFunctionLike(nextNode) || ts.isFunctionLike(nextNode.parent) ||
+                    ts.isClassLike(nextNode) || ts.isEnumDeclaration(nextNode)) {
                 classifications.push({commentClass: CommentClass.Header});
             }
             // Check for a member declaration
@@ -54,13 +66,6 @@ export class CommentClassifier {
                     }
                     child = child.getChildCount(sourceFile) > 0 ? child.getChildAt(0, sourceFile) : undefined;
                 }
-            }
-        }
-        const enclosingNodes = this.sourceMap.getEnclosingNodes(comment);
-        for (const parentNode of enclosingNodes) {
-            if (parentNode && ts.isFunctionLike(parentNode)) {
-                classifications.push({commentClass: CommentClass.Inline});
-                break;
             }
         }
         // TODO: Should also take position inside the file into account, i.e., most licenses
