@@ -39,6 +39,7 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
     private halsteadCollector = new HalsteadCollector();
     private commentQualityEvaluator = new CommentQualityEvaluator();
     private commentStats = new Map<SourceComment, ICommentStatistics>();
+    private distanceToSectionStart = new Map<number, number>();
 
     public walk(sourceFile: ts.SourceFile) {
         const collectors = [this.ccCollector, this.halsteadCollector, this.locCollector, this.nestingLevelCollector];
@@ -95,13 +96,17 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
             const commentsInLine = sourceMap.getCommentsInLine(currentLine);
             const correspondingComments = sourceMap.getCommentsBelongingToLine(currentLine);
             const enclosingNode = sourceMap.getMostEnclosingNodeForLine(currentLine);
+            let distanceToSectionStart = this.distanceToSectionStart.get(currentLine - 1) || 0;
 
             if (currentSectionStartLine === -1) {
                 currentSectionStartLine = currentLine;
+                distanceToSectionStart = 0;
             }
 
+            // A line filled only with comments or whitespace
             if (!enclosingNode) {
-                // A line filled only with comments, just like this very one.
+                this.distanceToSectionStart.set(currentLine, distanceToSectionStart);
+                // Only comments
                 if (commentsInLine.length > 0 && !previousLineWasCommentOnly) {
                     previousLineWasCommentOnly = true;
                     continue;
@@ -109,7 +114,7 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
                 // TODO: this is just here for live-feedback purposes
                 const failureStart = sourceMap.sourceFile.getPositionOfLineAndCharacter(currentSectionStartLine, 0);
                 this.addFailureAt(failureStart, 1, "sectionComplexity: " + sectionComplexity);
-
+                // Only whitespace
                 // One code section ending, a new one starting.
                 if (sectionComplexity > 0) {
                     // require comments for complex sections
@@ -127,8 +132,9 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
             let lineComplexity = 0;
             // TODO: use more metrics
             // Lines of code. Let's use 7 as magical border for increasing complexity by 1 for each line
-            // TODO: this includes comment lines, as they don't break sections and this is just start - end
-            const distanceToStartComplexity = Math.min(1, ((currentLine + 1) - currentSectionStartLine) / 7);
+            distanceToSectionStart += 1;
+            this.distanceToSectionStart.set(currentLine, distanceToSectionStart);
+            const distanceToStartComplexity = Math.min(1, distanceToSectionStart / 7);
 
             // Compare complexity here before adding any block/child related complexities,
             // as I want to catch complex lines in themselves and not nearly everything that has
