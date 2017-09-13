@@ -41,15 +41,8 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
     private commentStats = new Map<SourceComment, ICommentStatistics>();
 
     public walk(sourceFile: ts.SourceFile) {
-        // this.printForEachChild(sourceFile);
-        // this.printGetChildrenForEach(sourceFile);
         const collectors = [this.ccCollector, this.halsteadCollector, this.locCollector, this.nestingLevelCollector];
         const sourceMap = new SourceMap(sourceFile, collectors);
-        // TODO: use this.options() instead of hardcoded string
-        // Also: provide an option to choose from different code detection methods
-        // const codeDetector = new CustomCodeDetector("./comment-classification-rules/no-code")
-        // const ruleDirectory = "./node_modules/tslint/lib/rules";
-        // const codeDetector = new ExistingRuleBasedCodeDetector(ruleDirectory);
         const codeDetector = new TsCompilerBasedCodeDetector();
         const classifier = new CommentClassifier(codeDetector, sourceMap);
 
@@ -163,9 +156,6 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
                 currentLine = ts.getLineAndCharacterOfPosition(sourceMap.sourceFile, blockNode.getEnd()).line;
             }
         }
-        // if (sectionComplexities.isEmpty()) {
-        //     sectionComplexities.add({line: currentSectionStartLine, complexity: sectionComplexity});
-        // }
         // require comments for complex sections, but only if there is more than one section in a function
         let didAdd = false;
         if (sectionComplexities.size() > 1) {
@@ -212,7 +202,6 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
         if (enclosingNode) {
             line = sourceMap.sourceFile.getLineAndCharacterOfPosition(enclosingNode.getStart()).line;
         }
-        // const correspondingComments = sourceMap.getCommentsBelongingToLine(line);
         const nearestComments = sourceMap.getCommentsWithDistanceClosestToLine(line);
         const commentStats = this.commentStats;
         const qualityCommentPresent = nearestComments.some((commentDistance) => {
