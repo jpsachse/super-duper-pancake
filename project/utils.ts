@@ -89,11 +89,14 @@ export default class Utils {
      * @param camelCaseText Text with camelcase words in it. The text will be split along camelCasing and whitespace.
      */
     public static splitIntoNormalizedWords(camelCaseText: string): string[] {
-        return camelCaseText.replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+        return camelCaseText.replace(/([0-9])([a-zA-Z])/g, "$1 $2")
+                            .replace(/([a-zA-Z])([0-9])/g, "$1 $2")
+                            .replace(/([a-z])([A-Z])/g, "$1 $2")
                             .replace(/([A-Z])([A-Z][a-z])/g, "$1 $2")
                             .toLowerCase()
-                            .split(/\s/)
-                            .map((word) => word.replace(this.basicLatinPunctuation, ""));
+                            .split(/[\s\.\-\_]/)
+                            .map((word) => word.replace(this.basicLatinPunctuation, ""))
+                            .filter((word) => word.length > 0);
     }
 
     public static flatten(arrayOfArrays: any[][]): any[] {
