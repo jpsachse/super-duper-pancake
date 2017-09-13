@@ -11,25 +11,55 @@ export class LinesOfCodeCollector implements IMetricCollector {
         if (!(Utils.isNode(node) && TSUtils.isFunctionScopeBoundary(node))) {
             return;
         }
-        const textLines = node.getText().split("\n");
         // TODO: pass the SourceFile as parameter if performance is a problem, as this
         // probably just walks up the AST until it finds a SourceFile
         const sourceFile = node.getSourceFile();
+        const textLines = node.getText(sourceFile).split("\n");
         let linesOfCode = 0;
         let position = node.getStart();
+        const whiteSpaceRegexp = /^\s*/;
+
         textLines.forEach((line) => {
-            const whitespace = line.match(/^\s*/);
-            let whitespaceLength = 0;
-            if (whitespace && whitespace.length > 0) {
-                whitespaceLength = whitespace[0].length;
-            }
+            let whitespace = line.match(whiteSpaceRegexp);
+            let whitespaceLength = this.getLength(whitespace);
             const startOfLetters = position + whitespaceLength;
-            if (whitespaceLength < line.length && !TSUtils.isPositionInComment(sourceFile, startOfLetters)) {
-                linesOfCode++;
+            const comment = TSUtils.getCommentAtPosition(sourceFile, startOfLetters);
+            position += line.length + 1;
+            if (whitespaceLength >= line.length) {
+                return;
             }
-            position += line.length;
+            if (comment !== undefined) {
+                if (comment.end + 1 >= position) {
+                    return;
+                } else {
+                    let positionInLine = comment.end + 1;
+                    while (positionInLine < position) {
+                        const nextComment = TSUtils.getCommentAtPosition(sourceFile, positionInLine);
+                        if (nextComment !== undefined) {
+                            const textStart = comment.end - comment.pos + whitespaceLength;
+                            const textEnd = positionInLine - comment.pos + whitespaceLength;
+                            const textBetweenComments = line.substring(textStart, textEnd);
+                            whitespace = textBetweenComments.match(whiteSpaceRegexp);
+                            whitespaceLength = this.getLength(whitespace);
+                            if (whitespaceLength < positionInLine - comment.end) {
+                                linesOfCode++;
+                                return;
+                            }
+                            positionInLine = nextComment.end;
+                        } else {
+                            positionInLine++;
+                        }
+                    }
+                    return;
+                }
+            }
+            linesOfCode++;
         });
         this.linesOfCode.set(node, linesOfCode);
+    }
+
+    private getLength(match: RegExpMatchArray | null): number {
+        return (match && match.length > 0) ? match[0].length : 0;
     }
 
 }
