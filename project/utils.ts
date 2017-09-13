@@ -1,3 +1,4 @@
+import * as TSUtils from "tsutils";
 import * as ts from "typescript";
 import { SourcePart } from "./commentClassificationTypes";
 import { CommentClass, SourceComment } from "./sourceComment";
@@ -103,6 +104,47 @@ export default class Utils {
         return aString.charAt(0).toUpperCase() + aString.slice(1).toLowerCase();
     }
 
+    public static isCodeInLine(startPos: number, text: string, sourceFile: ts.SourceFile): boolean {
+        const whiteSpaceRegexp = /^\s*/;
+        let whitespace = text.match(whiteSpaceRegexp);
+        let whitespaceLength = this.getLength(whitespace);
+        if (whitespaceLength >= text.length) {
+            return false;
+        }
+        const startOfLetters = startPos + whitespaceLength;
+        const comment = TSUtils.getCommentAtPosition(sourceFile, startOfLetters);
+        const lineEnd = startPos + text.length + 1;
+        if (!comment) {
+            return true;
+        }
+
+        if (comment.end + 1 >= lineEnd) {
+            return false;
+        }
+        let positionInLine = comment.end + 1;
+        while (positionInLine < lineEnd) {
+            const nextComment = TSUtils.getCommentAtPosition(sourceFile, positionInLine);
+            if (nextComment !== undefined) {
+                const textStart = comment.end - comment.pos + whitespaceLength;
+                const textEnd = positionInLine - comment.pos + whitespaceLength;
+                const textBetweenComments = text.substring(textStart, textEnd);
+                whitespace = textBetweenComments.match(whiteSpaceRegexp);
+                whitespaceLength = this.getLength(whitespace);
+                if (whitespaceLength < positionInLine - comment.end) {
+                    return true;
+                }
+                positionInLine = nextComment.end;
+            } else {
+                positionInLine++;
+            }
+        }
+        return false;
+    }
+
     private static basicLatinPunctuation = /[\u0021-\u002F\u003A-\u0040\u005B-\u0060\u007B-\u007F]*/g;
+
+    private static getLength(match: RegExpMatchArray | null): number {
+        return (match && match.length > 0) ? match[0].length : 0;
+    }
 
 }

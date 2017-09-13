@@ -17,49 +17,14 @@ export class LinesOfCodeCollector implements IMetricCollector {
         const textLines = node.getText(sourceFile).split("\n");
         let linesOfCode = 0;
         let position = node.getStart();
-        const whiteSpaceRegexp = /^\s*/;
 
         textLines.forEach((line) => {
-            let whitespace = line.match(whiteSpaceRegexp);
-            let whitespaceLength = this.getLength(whitespace);
-            const startOfLetters = position + whitespaceLength;
-            const comment = TSUtils.getCommentAtPosition(sourceFile, startOfLetters);
+            if (Utils.isCodeInLine(position, line, sourceFile)) {
+                linesOfCode++;
+            }
             position += line.length + 1;
-            if (whitespaceLength >= line.length) {
-                return;
-            }
-            if (comment !== undefined) {
-                if (comment.end + 1 >= position) {
-                    return;
-                } else {
-                    let positionInLine = comment.end + 1;
-                    while (positionInLine < position) {
-                        const nextComment = TSUtils.getCommentAtPosition(sourceFile, positionInLine);
-                        if (nextComment !== undefined) {
-                            const textStart = comment.end - comment.pos + whitespaceLength;
-                            const textEnd = positionInLine - comment.pos + whitespaceLength;
-                            const textBetweenComments = line.substring(textStart, textEnd);
-                            whitespace = textBetweenComments.match(whiteSpaceRegexp);
-                            whitespaceLength = this.getLength(whitespace);
-                            if (whitespaceLength < positionInLine - comment.end) {
-                                linesOfCode++;
-                                return;
-                            }
-                            positionInLine = nextComment.end;
-                        } else {
-                            positionInLine++;
-                        }
-                    }
-                    return;
-                }
-            }
-            linesOfCode++;
         });
         this.linesOfCode.set(node, linesOfCode);
-    }
-
-    private getLength(match: RegExpMatchArray | null): number {
-        return (match && match.length > 0) ? match[0].length : 0;
     }
 
 }
