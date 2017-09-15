@@ -212,6 +212,10 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
         const commentStats = this.commentStats;
         const qualityCommentPresent = nearestComments.some((commentDistance) => {
             const stats = commentStats.get(commentDistance.comment);
+            const isAnnotation = (classification: ICommentClassification) => {
+                return classification.commentClass === CommentClass.Annotation && !classification.lines;
+            };
+            if (stats.classifications.some(isAnnotation)) { return false; }
             return stats.quality > CommentQuality.Low &&
                 commentDistance.distance <= stats.quality - CommentQuality.Low + 1;
         });

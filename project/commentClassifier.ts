@@ -1,5 +1,6 @@
 import * as Lint from "tslint";
 import * as ts from "typescript";
+import { AnnotationMatcher } from "./annotationMatcher";
 import { CodeDetector } from "./codeDetector";
 import { ICommentClassification } from "./commentClassificationTypes";
 import { LicenseMatcher } from "./licenseMatcher";
@@ -17,23 +18,14 @@ interface IInternalClassificationResult {
 
 export class CommentClassifier {
 
-// Comment categories from "Quality analysis of source code comments."
-//   - Copyright comments
-//   - Header comments
-//   - Member comments
-//   - Inline comments
-//   - Section comments
-//   - Code comments
-//   - Task comments
-
     private licenseMatcher = new LicenseMatcher();
     private taskCommentMatcher = new TaskCommentMatcher();
+    private annotationMatcher = new AnnotationMatcher();
 
     constructor(private codeDetector: CodeDetector, private sourceMap: SourceMap) {}
 
     public classify(comment: SourceComment): ICommentClassification[] {
         const commentText = comment.getSanitizedCommentText().text;
-        const sanitizedLines = comment.getSanitizedCommentLines();
         const commentLine = this.sourceMap.sourceFile.getLineAndCharacterOfPosition(comment.end).line;
         const nodeLine = comment.isTrailing ? commentLine : commentLine + 1;
         const nextNode = this.sourceMap.getMostEnclosingNodeForLine(nodeLine);
@@ -71,6 +63,7 @@ export class CommentClassifier {
         // TODO: Should also take position inside the file into account, i.e., most licenses
         // are at the beginning of a file and not somewhere in the middle.
         classifications.push(...this.licenseMatcher.classify(comment));
+        classifications.push(...this.annotationMatcher.classify(comment));
         classifications.push(...this.codeDetector.classify(comment));
         classifications.push(...this.taskCommentMatcher.classify(comment));
         return classifications;

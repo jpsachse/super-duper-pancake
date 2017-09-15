@@ -9,6 +9,7 @@ export enum CommentClass {
     Section,
     Code,
     Task,
+    Annotation,
     Unknown,
 }
 
