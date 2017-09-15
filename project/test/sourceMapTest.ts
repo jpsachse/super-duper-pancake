@@ -179,6 +179,16 @@ describe("getMostEnclosingNodeForLine", () => {
         expect(node.kind).to.equal(ts.SyntaxKind.ExpressionStatement);
     });
 
+    it("should return a variable declaration when checking for a line with one", () => {
+        const map = createSourceMap("test/sourceMapTest/getMostEnclosingNodeForLine.ts");
+        const node = map.getMostEnclosingNodeForLine(11);
+        expect(node).to.not.equal(undefined);
+        const lineAndChar = map.sourceFile.getLineAndCharacterOfPosition(node.getStart());
+        expect(lineAndChar.character).to.equal(0);
+        expect(lineAndChar.line).to.equal(11);
+        expect(node.kind).to.equal(ts.SyntaxKind.VariableStatement);
+    });
+
 });
 
 describe("isBlockStartingInLine", () => {

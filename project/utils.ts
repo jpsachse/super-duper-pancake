@@ -40,6 +40,7 @@ export default class Utils {
         // ts.SyntaxKind.ConstructSignatureDeclaration
         // ts.SyntaxKind.Parameter
         // ts.SyntaxKind.IndexSignature
+        // ts.SyntaxKind.VariableDeclaration
         // special case: ts.SyntaxKind.VariableDeclarationList, which has an array of VariableDeclarations
         return (node.kind === ts.SyntaxKind.ClassDeclaration ||
                 node.kind === ts.SyntaxKind.Constructor ||
@@ -56,8 +57,7 @@ export default class Utils {
                 node.kind === ts.SyntaxKind.PropertyDeclaration ||
                 node.kind === ts.SyntaxKind.SetAccessor ||
                 node.kind === ts.SyntaxKind.TypeAliasDeclaration ||
-                node.kind === ts.SyntaxKind.TypeParameter ||
-                node.kind === ts.SyntaxKind.VariableDeclaration);
+                node.kind === ts.SyntaxKind.TypeParameter);
     }
 
     /**
