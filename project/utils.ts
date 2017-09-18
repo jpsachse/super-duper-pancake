@@ -107,7 +107,17 @@ export default class Utils {
         return aString.charAt(0).toUpperCase() + aString.slice(1).toLowerCase();
     }
 
-    public static isCodeInLine(startPos: number, text: string, sourceFile: ts.SourceFile): boolean {
+    /**
+     * Determines based on comment ranges if anything but comments and whitespace are contained in the passed line.
+     * @param startPos The starting position of the line in the source file.
+     * @param sourceFile The source file that contains the line.
+     * * @param text The text of the line. If not provided, the text will be fetched from the source file.
+     */
+    public static isCodeInLine(startPos: number, sourceFile: ts.SourceFile, text?: string): boolean {
+        const lineEnd = sourceFile.getLineEndOfPosition(startPos);
+        if (!text) {
+            text = sourceFile.text.substring(startPos, lineEnd);
+        }
         const whiteSpaceRegexp = /^\s*/;
         let whitespace = text.match(whiteSpaceRegexp);
         let whitespaceLength = this.getLength(whitespace);
@@ -116,7 +126,6 @@ export default class Utils {
         }
         const startOfLetters = startPos + whitespaceLength;
         const comment = TSUtils.getCommentAtPosition(sourceFile, startOfLetters);
-        const lineEnd = startPos + text.length + 1;
         if (!comment) {
             return true;
         }

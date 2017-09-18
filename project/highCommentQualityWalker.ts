@@ -132,7 +132,10 @@ export class HighCommentQualityWalker extends Lint.AbstractWalker<Set<string>> {
             let lineComplexity = 0;
             // TODO: use more metrics
             // Lines of code. Let's use 7 as magical border for increasing complexity by 1 for each line
-            distanceToSectionStart += 1;
+            const currentLinePos = sourceMap.sourceFile.getPositionOfLineAndCharacter(currentSectionStartLine, 0);
+            if (Utils.isCodeInLine(currentLinePos, sourceMap.sourceFile)) {
+                distanceToSectionStart += 1;
+            }
             this.distanceToSectionStart.set(currentLine, distanceToSectionStart);
             const distanceToStartComplexity = Math.min(1, distanceToSectionStart / 7);
 

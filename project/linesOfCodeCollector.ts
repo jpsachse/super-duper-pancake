@@ -19,7 +19,7 @@ export class LinesOfCodeCollector implements IMetricCollector {
         let position = node.getStart();
 
         textLines.forEach((line) => {
-            if (Utils.isCodeInLine(position, line, sourceFile)) {
+            if (Utils.isCodeInLine(position, sourceFile, line)) {
                 linesOfCode++;
             }
             position += line.length + 1;
