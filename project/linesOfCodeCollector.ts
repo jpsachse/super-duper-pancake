@@ -11,20 +11,36 @@ export class LinesOfCodeCollector implements IMetricCollector {
         if (!(Utils.isNode(node) && TSUtils.isFunctionScopeBoundary(node))) {
             return;
         }
-        // TODO: pass the SourceFile as parameter if performance is a problem, as this
-        // probably just walks up the AST until it finds a SourceFile
-        const sourceFile = node.getSourceFile();
-        const textLines = node.getText(sourceFile).split("\n");
+        const codeNode = ts.isFunctionLike(node) ? node.body : node;
+
+        const sourceFile = codeNode.getSourceFile();
+        const textLines = codeNode.getText(sourceFile).split("\n");
         let linesOfCode = 0;
-        let position = node.getStart();
+        let position = codeNode.getStart();
+        let didIncludeCodePreviously = false;
+        let skippedLines = 0;
 
         textLines.forEach((line) => {
-            if (Utils.isCodeInLine(position, sourceFile, line)) {
-                linesOfCode++;
+            const potentiallyContainsCode = !this.containsOnlyBraces(line);
+            if (!potentiallyContainsCode && didIncludeCodePreviously) {
+                skippedLines++;
+            }
+            if (potentiallyContainsCode && Utils.isCodeInLine(position, sourceFile, line)) {
+                didIncludeCodePreviously = true;
+                linesOfCode += skippedLines + 1;
+                skippedLines = 0;
             }
             position += line.length + 1;
         });
         this.linesOfCode.set(node, linesOfCode);
+    }
+
+    public getLoc(node: ts.Node): number | undefined {
+        return this.linesOfCode.get(node);
+    }
+
+    private containsOnlyBraces(text: string): boolean {
+        return /^\s*[{|}]+\s*$/.test(text);
     }
 
 }

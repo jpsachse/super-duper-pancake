@@ -27,3 +27,15 @@ function trickyCommentOnlyLines(): number {
     /* I don't know why*/  /*, but people can be evil */
     return bar;
 }
+
+function inlineStartAndEndBraces(): number
+{   const bar = 5;
+    return bar; }
+
+function soManyBraces(): number {{
+    const bar = 5;
+    {}
+    {
+    }
+    return bar;
+}}
