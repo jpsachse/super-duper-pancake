@@ -9,8 +9,8 @@ export default class Utils {
         return Array.from({length: end - start + 1}, (value, key) => key + start);
     }
 
-    public static isNode(element: SourcePart): element is ts.Node {
-        return (element as ts.Node).kind !== undefined;
+    public static isNode(element?: SourcePart): element is ts.Node {
+        return element && (element as ts.Node).kind !== undefined;
     }
 
     public static isStatement(node: ts.Node): node is ts.Statement {

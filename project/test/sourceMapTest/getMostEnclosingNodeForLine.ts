@@ -1,4 +1,4 @@
-
+// tslint:disable
 foo.bar().baz();
 
 class Foo {
@@ -13,3 +13,12 @@ const bar = () => {
     const aNumber = 5;
     aNumber.toExponential().toLocaleLowerCase().trim();
 };
+
+class InlineEnding {
+    private aMethod(): number {
+
+        return 5;
+    }}
+
+function test(): number {
+    return 5; }

@@ -159,8 +159,18 @@ export class SourceMap {
         // of complexity scores for block-starting lines.
         const nodes = this.nodesOfLine.get(line);
         if (!nodes || nodes.length === 0) { return; }
-        let node = nodes[nodes.length - 1];
-        if (!Utils.isNode(node)) { return; }
+        let index = 0;
+        while (index < nodes.length && (!Utils.isNode(nodes[index]) || this.isSkippableNode(nodes[index]) ||
+                this.sourceFile.getLineAndCharacterOfPosition(nodes[index].getStart()).line < line)) {
+            index++;
+        }
+        let node: SourcePart;
+        if (index < nodes.length) {
+            node = nodes[index];
+        }
+        if (!Utils.isNode(node)) {
+            return;
+        }
         while (node.parent !== undefined && !Utils.isStatement(node) && !Utils.isDeclaration(node)) {
             node = node.parent;
         }
@@ -246,6 +256,16 @@ export class SourceMap {
             previousLineWasTrailing = isTrailingComment;
         }, sourceFile);
         return result;
+    }
+
+    private isSkippableNode(node: SourcePart): boolean {
+        return Utils.isNode(node) && (
+                node.kind === ts.SyntaxKind.SyntaxList ||
+                node.kind === ts.SyntaxKind.CloseBraceToken ||
+                node.kind === ts.SyntaxKind.CloseParenToken ||
+                node.kind === ts.SyntaxKind.CloseBracketToken ||
+                node.kind === ts.SyntaxKind.SemicolonToken ||
+                node.kind === ts.SyntaxKind.SemicolonClassElement);
     }
 
 }

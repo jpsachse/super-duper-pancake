@@ -166,7 +166,7 @@ describe("getMostEnclosingNodeForLine", () => {
         expect(node).to.equal(undefined);
     });
 
-    it("should return undefined for an empty line in a block", () => {
+    it("should return undefined for an empty line in a class declaration", () => {
         const map = createSourceMap("test/sourceMapTest/getMostEnclosingNodeForLine.ts");
         const node = map.getMostEnclosingNodeForLine(4);
         expect(node).to.equal(undefined);
@@ -187,6 +187,25 @@ describe("getMostEnclosingNodeForLine", () => {
         expect(lineAndChar.character).to.equal(0);
         expect(lineAndChar.line).to.equal(11);
         expect(node.kind).to.equal(ts.SyntaxKind.VariableStatement);
+    });
+
+    it("should return undefined for an empty line in a function", () => {
+        const map = createSourceMap("test/sourceMapTest/getMostEnclosingNodeForLine.ts");
+        const node = map.getMostEnclosingNodeForLine(18);
+        expect(node).to.equal(undefined);
+    });
+
+    it("should return undefined if the line contains only closing braces", () => {
+        const map = createSourceMap("test/sourceMapTest/getMostEnclosingNodeForLine.ts");
+        const node = map.getMostEnclosingNodeForLine(20);
+        expect(node).to.equal(undefined);
+    });
+
+    it("should return the correct statement if the line ends with the parent's closing brace", () => {
+        const map = createSourceMap("test/sourceMapTest/getMostEnclosingNodeForLine.ts");
+        const node = map.getMostEnclosingNodeForLine(23);
+        expect(node).to.not.equal(undefined);
+        expect(node.kind).to.equal(ts.SyntaxKind.ReturnStatement);
     });
 
 });
