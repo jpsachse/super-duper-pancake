@@ -102,6 +102,10 @@ export class SourceComment implements TextRange {
         return this.commentParts[this.commentParts.length - 1].end;
     }
 
+    public getStart(): number {
+        return this.pos;
+    }
+
     private stripCommentStartTokens(text: string): string {
         const lines = text.split("\n");
         const result = [];

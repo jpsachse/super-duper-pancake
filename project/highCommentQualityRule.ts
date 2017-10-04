@@ -1,11 +1,19 @@
 import * as Lint from "tslint";
 import * as ts from "typescript";
-import { HighCommentQualityWalker } from "./highCommentQualityWalker";
+import { HighCommentQualityWalkerV2 } from "./highCommentQualityWalkerV2";
+import { CyclomaticComplexityCollector, LinesOfCodeCollector } from "./metricCollectors";
+import { TsCompilerBasedCodeDetector } from "./tsCompilerBasedCodeDetector";
 
 export class Rule extends Lint.Rules.AbstractRule {
 
     public apply(sourceFile: ts.SourceFile): Lint.RuleFailure[] {
-        return this.applyWithWalker(new HighCommentQualityWalker(
-            sourceFile, "high-comment-quality", new Set(this.ruleArguments.map(String))));
+        const locCollector = new LinesOfCodeCollector();
+        const ccCollector = new CyclomaticComplexityCollector();
+        const codeDetector = new TsCompilerBasedCodeDetector();
+        return this.applyWithWalker(new HighCommentQualityWalkerV2(
+            sourceFile, "high-comment-quality", new Set(this.ruleArguments.map(String)),
+            locCollector, ccCollector, codeDetector));
+        // return this.applyWithWalker(new HighCommentQualityWalker(
+        //     sourceFile, "high-comment-quality", new Set(this.ruleArguments.map(String))));
     }
 }

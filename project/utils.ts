@@ -5,6 +5,8 @@ import { CommentClass, SourceComment } from "./sourceComment";
 
 export default class Utils {
 
+    public static commentOnlyLineRegxp = /^\s*(\/\/|\/\*)/gm;
+
     public static createRange(start: number, end: number) {
         return Array.from({length: end - start + 1}, (value, key) => key + start);
     }

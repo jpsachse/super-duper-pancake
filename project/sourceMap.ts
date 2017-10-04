@@ -243,9 +243,8 @@ export class SourceMap {
                 }
                 return false;
             }) as ts.JSDoc[];
-            const commentOnlyLineRegxp = /^\s*(\/\/|\/\*)/gm;
             const currentLineText = sourceLines[currentCommentStartLine];
-            const isTrailingComment = !currentLineText.match(commentOnlyLineRegxp);
+            const isTrailingComment = !currentLineText.match(Utils.commentOnlyLineRegxp);
             if (previousLineWasTrailing || isTrailingComment ||
                     previousCommentEndLine === -1 || currentCommentStartLine > previousCommentEndLine + 1) {
                 result.push(new SourceComment(pos, end, fullText.substring(pos, end), jsDoc, isTrailingComment));
