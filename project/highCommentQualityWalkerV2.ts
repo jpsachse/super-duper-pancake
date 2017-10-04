@@ -93,12 +93,7 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
             if (cyclomaticComplexity) {
                 complexity += cyclomaticComplexity;
             }
-            if (TSUtils.isFunctionScopeBoundary(node.parent)) {
-                const locComplexity = this.locCollector.getLoc(node.parent);
-                if (locComplexity) {
-                    complexity += locComplexity;
-                }
-            }
+            complexity += this.getLocForNode(node);
         }
         if (ts.isCallLikeExpression(node) || ts.isBinaryExpression(node) ||
                 ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression (node)) {
@@ -113,6 +108,30 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
             this.nodeComplexities.set(node, complexity);
         }
         return complexity;
+    }
+
+    private getLocForNode(node: ts.Node): number {
+        if (ts.isIfStatement(node.parent)) {
+            let locComplexity: number;
+            if (node.parent.thenStatement === node) {
+                locComplexity = this.locCollector.getLoc(node.parent);
+            } else {
+                const elseKeyword = node.getChildren().find((child) => {
+                    return child.kind === ts.SyntaxKind.ElseKeyword;
+                });
+                locComplexity = this.locCollector.getLoc(elseKeyword);
+            }
+            if (locComplexity) {
+                return locComplexity;
+            }
+        }
+        if (ts.isBlock(node)) {
+            const locComplexity = this.locCollector.getLoc(node.parent);
+            if (locComplexity) {
+                return locComplexity;
+            }
+        }
+        return 1;
     }
 
     private analyzeIfStatement(node: ts.IfStatement): number {
@@ -181,20 +200,23 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
                     previousLineWasCommentOnly = true;
                     continue;
                 }
-                if (noContentRegexp.test(currentLineText) || commentsInLine.length > 0) {
-                    // start a new section
-                    if (sectionComplexity > 0) {
-                        this.enforceCommentRequirementForSection(sectionComplexity,
-                                                                 HighCommentQualityWalkerV2.sectionComplexityThreshold,
-                                                                 currentSectionStartLine,
-                                                                 lineComplexities,
-                                                                 HighCommentQualityWalkerV2.lineComplexityThreshold);
-                        sectionComplexities.add({line: currentSectionStartLine, complexity: sectionComplexity});
-                        sectionComplexity = 0;
-                    }
-                    currentSectionStartLine = -1;
-                    lineComplexities.clear();
+                // if (noContentRegexp.test(currentLineText) || commentsInLine.length > 0) {
+                // TODO: this is just here for live-feedback purposes
+                const failureStart = this.sourceMap.sourceFile.getPositionOfLineAndCharacter(currentSectionStartLine, 0);
+                this.addFailureAt(failureStart, 1, "sectionComplexity: " + sectionComplexity);
+                // start a new section
+                if (sectionComplexity > 0) {
+                    this.enforceCommentRequirementForSection(sectionComplexity,
+                                                             HighCommentQualityWalkerV2.sectionComplexityThreshold,
+                                                             currentSectionStartLine,
+                                                             lineComplexities,
+                                                             HighCommentQualityWalkerV2.lineComplexityThreshold);
+                    sectionComplexities.add({line: currentSectionStartLine, complexity: sectionComplexity});
+                    sectionComplexity = 0;
                 }
+                currentSectionStartLine = -1;
+                lineComplexities.clear();
+                // }
                 continue;
             }
             previousLineWasCommentOnly = false;
@@ -310,7 +332,8 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
             // (i.e., the line, where the previous enclosing node starts) also has a comment requirement.
             const previousNode = this.sourceMap.getSourcePartBefore(node);
             if (previousNode) {
-                let previousLine = this.sourceMap.sourceFile.getLineAndCharacterOfPosition(previousNode.pos).line;
+                let previousLine =
+                        this.sourceMap.sourceFile.getLineAndCharacterOfPosition(previousNode.getStart()).line;
                 const previousEnclosingNode = this.sourceMap.getMostEnclosingNodeForLine(previousLine);
                 if (previousEnclosingNode) {
                     const enclosingStart = previousEnclosingNode.getStart();

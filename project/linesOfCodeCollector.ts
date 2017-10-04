@@ -8,10 +8,22 @@ export class LinesOfCodeCollector implements IMetricCollector {
     private linesOfCode = new Map<ts.Node, number>();
 
     public visitNode(node: SourcePart) {
-        if (!(Utils.isNode(node) && TSUtils.isFunctionScopeBoundary(node))) {
+        if (!(Utils.isNode(node))) {
             return;
         }
-        const codeNode = ts.isFunctionLike(node) ? node.body : node;
+        let codeNode: ts.Node;
+        if (ts.isFunctionLike(node)) {
+            codeNode = node.body;
+        } else if (ts.isIfStatement(node)) {
+            codeNode = node.thenStatement;
+        } else if (node.kind === ts.SyntaxKind.ElseKeyword) {
+            codeNode = (node.parent as ts.IfStatement).elseStatement;
+        } else if (ts.isBlock(node)) {
+            codeNode = node;
+            node = node.parent;
+        } else {
+            return;
+        }
 
         const sourceFile = codeNode.getSourceFile();
         const textLines = codeNode.getText(sourceFile).split("\n");
