@@ -31,6 +31,11 @@ export class CommentQualityEvaluator {
         if (nextNode === undefined) {
             nextNode = sourceMap.getFirstNodeAfterLine(commentEndLine);
         }
+        // If this comment is a jsDoc comment, its end will lie within the JSDoc node, which will be
+        // returned by getFirstNodeInLine, but we actually want to assess the quality relative to its parent.
+        if (ts.isJSDoc(nextNode) && comment.getCompleteComment().jsDoc.find((jsDoc) => jsDoc === nextNode)) {
+            nextNode = nextNode.parent;
+        }
         if (nextNode !== undefined) {
             if (Utils.isDeclaration(nextNode)) {
                 return this.assessDeclarationComment(comment, nextNode, sourceMap);
@@ -63,10 +68,27 @@ export class CommentQualityEvaluator {
         } else {
             commentText = comment.getSanitizedCommentText().text;
         }
-        const name = ts.getNameOfDeclaration(declaration);
-        const nameText = name === undefined ? ts.SyntaxKind[declaration.kind] : name.getText(sourceMap.sourceFile);
-        quality = this.assessQualityBasedOnName(commentText, nameText, quality);
+        let name = this.getNameOfDeclaration(declaration);
+        let additionalNameParts: string[] = [];
+        // Add the names of the parameters to the declaration names to force naming them in the comment
+        // text, but only do so if it's not a JSDoc comment, as this is handled in assessJSDocComment.
+        if (ts.isFunctionLike(declaration) && jsDocs.length === 0) {
+            additionalNameParts = this.getParameterNames(declaration);
+        }
+        name += " " + additionalNameParts.join(" ");
+        quality = this.assessQualityBasedOnName(commentText, name, quality);
         return quality;
+    }
+
+    private getParameterNames(declaration: ts.FunctionLikeDeclaration): string[] {
+        return declaration.parameters.map((parameter) => {
+            return this.getNameOfDeclaration(parameter);
+        });
+    }
+
+    private getNameOfDeclaration(declaration: ts.Declaration): string {
+        const name = ts.getNameOfDeclaration(declaration);
+        return name ? name.getText() : ts.SyntaxKind[declaration.kind];
     }
 
     /**
@@ -78,11 +100,8 @@ export class CommentQualityEvaluator {
      * @param quality The quality of the comment, as assessed until the point of calling this method
      */
     private assessJSDocComment(jsDoc: ts.JSDoc, declaration: ts.Declaration, quality: CommentQuality): CommentQuality {
-        const test = Utils.capitalize("");
         const assessParameterCommentQuality = (comment: string, parameter: ts.ParameterDeclaration): CommentQuality => {
-            const typeName = parameter.type.getText();
-            const typedParameterName = parameter.name.getText() + Utils.capitalize(typeName);
-            return this.assessQualityBasedOnName(comment, typedParameterName, CommentQuality.Medium);
+            return this.assessQualityBasedOnName(comment, this.getNameOfDeclaration(parameter), CommentQuality.Medium);
         };
         const jsDocParameterComments = new Map<string, string>();
         jsDoc.forEachChild((docChild) => {
@@ -91,21 +110,27 @@ export class CommentQualityEvaluator {
             }
         });
         // Lower the comment quality if parameters are missing from the JSDoc
-        let didCommentAllParametersWell = true;
+        let commentedParameterCount = 0;
+        let lowQualityCommentParameterCount = 0;
         declaration.forEachChild((child) => {
             if (ts.isParameter(child)) {
                 const parameterComment = jsDocParameterComments.get(child.name.getText());
-                let parameterQuality = CommentQuality.Unhelpful;
-                if (parameterComment) {
-                    parameterQuality = assessParameterCommentQuality(parameterComment, child);
-                }
-                if (parameterQuality < CommentQuality.Medium) {
+                if (!parameterComment) {
                     quality = this.lowerQuality(quality);
-                    didCommentAllParametersWell = false;
+                    return;
+                }
+                commentedParameterCount++;
+                const parameterQuality = assessParameterCommentQuality(parameterComment, child);
+                if (parameterQuality < CommentQuality.Medium) {
+                    lowQualityCommentParameterCount += CommentQuality.Medium - parameterQuality;
+                } else if (parameterQuality > CommentQuality.Medium) {
+                    lowQualityCommentParameterCount -= parameterQuality - CommentQuality.Medium;
                 }
             }
         });
-        if (didCommentAllParametersWell) {
+        if (lowQualityCommentParameterCount >= commentedParameterCount) {
+            quality = this.lowerQuality(quality);
+        } else if (lowQualityCommentParameterCount < 0) {
             quality = this.higherQuality(quality);
         }
         return quality;
@@ -117,7 +142,7 @@ export class CommentQualityEvaluator {
         const nameParts = this.normaliseWords(
                 this.filterCommonWords(Utils.splitIntoNormalizedWords(nodeName))).sort();
         const intersection = Utils.getIntersection(nameParts, commentParts);
-        if (intersection.length / commentParts.length > 0.5) {
+        if (intersection.length / commentParts.length > 0.4) {
             quality = this.lowerQuality(quality);
         } else {
             // TODO: more heuristics upon what is good comment text
