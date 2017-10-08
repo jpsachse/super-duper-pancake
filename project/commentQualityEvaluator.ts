@@ -1,3 +1,5 @@
+import * as compendium from "compendium-js";
+import * as stopword from "stopword";
 import * as ts from "typescript";
 import { ICommentClassification } from "./commentClassificationTypes";
 import { CommentClass, ICommentPart, SourceComment } from "./sourceComment";
@@ -110,8 +112,10 @@ export class CommentQualityEvaluator {
     }
 
     private assessQualityBasedOnName(comment: string, nodeName: string, quality: CommentQuality): CommentQuality {
-        const commentParts = this.filterCommonWords(Utils.splitIntoNormalizedWords(comment).sort());
-        const nameParts = Utils.splitIntoNormalizedWords(nodeName).sort();
+        const commentParts = this.normaliseWords(
+                this.filterCommonWords(Utils.splitIntoNormalizedWords(comment))).sort();
+        const nameParts = this.normaliseWords(
+                this.filterCommonWords(Utils.splitIntoNormalizedWords(nodeName))).sort();
         const intersection = Utils.getIntersection(nameParts, commentParts);
         if (intersection.length / commentParts.length > 0.5) {
             quality = this.lowerQuality(quality);
@@ -123,9 +127,15 @@ export class CommentQualityEvaluator {
     }
 
     private filterCommonWords(words: string[]): string[] {
-        // TODO: implement this
-        return words.filter((word) => {
-            return true;
+        return stopword.removeStopwords(words);
+    }
+
+    private normaliseWords(words: string[]): string[] {
+        const inflector = compendium.inflector;
+        const result: string[] = [];
+        return words.map((word, index) => {
+            const normalized = inflector.infinitive(word);
+            return normalized ? normalized : word;
         });
     }
 
