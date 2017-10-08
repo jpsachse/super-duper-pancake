@@ -16,6 +16,9 @@ export enum CommentQuality {
 
 export class CommentQualityEvaluator {
 
+    private static WORD_MATCH_THRESHOLD = 0.5;
+    private static PARAMETER_WORD_MATCH_THRESHOLD = 0.8;
+
     public evaluateQuality(comment: SourceComment,
                            classifications: ICommentClassification[],
                            sourceMap: SourceMap): CommentQuality {
@@ -76,7 +79,10 @@ export class CommentQualityEvaluator {
             additionalNameParts = this.getParameterNames(declaration);
         }
         name += " " + additionalNameParts.join(" ");
-        quality = this.assessQualityBasedOnName(commentText, name, quality);
+        quality = this.assessQualityBasedOnName(commentText,
+                                                name,
+                                                quality,
+                                                CommentQualityEvaluator.WORD_MATCH_THRESHOLD);
         return quality;
     }
 
@@ -101,7 +107,10 @@ export class CommentQualityEvaluator {
      */
     private assessJSDocComment(jsDoc: ts.JSDoc, declaration: ts.Declaration, quality: CommentQuality): CommentQuality {
         const assessParameterCommentQuality = (comment: string, parameter: ts.ParameterDeclaration): CommentQuality => {
-            return this.assessQualityBasedOnName(comment, this.getNameOfDeclaration(parameter), CommentQuality.Medium);
+            return this.assessQualityBasedOnName(comment,
+                                                 this.getNameOfDeclaration(parameter),
+                                                 CommentQuality.Medium,
+                                                 CommentQualityEvaluator.PARAMETER_WORD_MATCH_THRESHOLD);
         };
         const jsDocParameterComments = new Map<string, string>();
         jsDoc.forEachChild((docChild) => {
@@ -136,13 +145,14 @@ export class CommentQualityEvaluator {
         return quality;
     }
 
-    private assessQualityBasedOnName(comment: string, nodeName: string, quality: CommentQuality): CommentQuality {
-        const commentParts = this.normaliseWords(
-                this.filterCommonWords(Utils.splitIntoNormalizedWords(comment))).sort();
+    private assessQualityBasedOnName(comment: string, nodeName: string,
+                                     quality: CommentQuality, threshold: number): CommentQuality {
+        const usefulCommentParts = this.normaliseWords(
+                    this.filterCommonWords(Utils.splitIntoNormalizedWords(comment))).sort();
         const nameParts = this.normaliseWords(
                 this.filterCommonWords(Utils.splitIntoNormalizedWords(nodeName))).sort();
-        const intersection = Utils.getIntersection(nameParts, commentParts);
-        if (intersection.length / commentParts.length > 0.4) {
+        const intersection = Utils.getIntersection(nameParts, usefulCommentParts);
+        if (intersection.length / usefulCommentParts.length > threshold) {
             quality = this.lowerQuality(quality);
         } else {
             // TODO: more heuristics upon what is good comment text
