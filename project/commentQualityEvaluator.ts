@@ -31,22 +31,22 @@ export class CommentQualityEvaluator {
         }
         const commentEndLine = sourceMap.sourceFile.getLineAndCharacterOfPosition(comment.end).line;
         let nextNode = sourceMap.getFirstNodeInLine(commentEndLine);
-        if (nextNode === undefined) {
+        if (!nextNode) {
             nextNode = sourceMap.getFirstNodeAfterLine(commentEndLine);
+        }
+        if (!nextNode) {
+            return CommentQuality.Unknown;
         }
         // If this comment is a jsDoc comment, its end will lie within the JSDoc node, which will be
         // returned by getFirstNodeInLine, but we actually want to assess the quality relative to its parent.
         if (ts.isJSDoc(nextNode) && comment.getCompleteComment().jsDoc.find((jsDoc) => jsDoc === nextNode)) {
             nextNode = nextNode.parent;
         }
-        if (nextNode !== undefined) {
-            if (Utils.isDeclaration(nextNode)) {
-                return this.assessDeclarationComment(comment, nextNode, sourceMap);
-            } else {
-                return this.assessInlineComment(comment, nextNode, sourceMap);
-            }
+        if (Utils.isDeclaration(nextNode)) {
+            return this.assessDeclarationComment(comment, nextNode, sourceMap);
+        } else {
+            return this.assessInlineComment(comment, nextNode, sourceMap);
         }
-        return CommentQuality.Unknown;
     }
 
     private assessInlineComment(comment: SourceComment, nextNode: ts.Node, sourceMap: SourceMap): CommentQuality {
