@@ -69,7 +69,7 @@ export class SourceMap {
         const position = this.positionOfNode.get(node);
         if (!position) { return; }
         const startLine = this.sourceFile.getLineAndCharacterOfPosition(position.pos).line;
-        const enclosingNode = this.getMostEnclosingNodeForLine(startLine - 1);
+        const enclosingNode = this.getMostEnclosingNodeForLine(Math.max(0, startLine - 1));
         if (!enclosingNode) { return; }
         const previousNodes = this.nodesOfLine.get(startLine - 1);
         if (!previousNodes) { return; }
