@@ -176,7 +176,18 @@ export class SourceMap {
         while (node.parent !== undefined && !Utils.isStatement(node) && !Utils.isDeclaration(node)) {
             node = node.parent;
         }
+        if (ts.isIfStatement(node) && node.elseStatement &&
+                this.sourceFile.getLineAndCharacterOfPosition(node.elseStatement.pos).line <= line) {
+            return node.getChildren().filter((child) => child.kind === ts.SyntaxKind.ElseKeyword)[0];
+        }
         return node;
+    }
+
+    public getNextEnclosingParentForNode(node: ts.Node): ts.Node {
+        if (!node.parent) { return undefined; }
+        if (node.parent === this.sourceFile) { return this.sourceFile; }
+        const lineOfParent = this.sourceFile.getLineAndCharacterOfPosition(node.parent.pos).line;
+        return this.getMostEnclosingNodeForLine(lineOfParent);
     }
 
     public isBlockStartingInLine(line: number): boolean {
@@ -209,8 +220,21 @@ export class SourceMap {
     }
 
     public getCommentsBelongingToNode(node: ts.Node): SourceComment[] {
-        const line = ts.getLineAndCharacterOfPosition(this.sourceFile, node.pos).line;
-        return this.getCommentsBelongingToLine(line);
+        let line = ts.getLineAndCharacterOfPosition(this.sourceFile, node.getStart()).line;
+        const comments = this.getCommentsBelongingToLine(line);
+        if (this.isConditionalBlockStart(node)) {
+            let end = node.end;
+            if (node.kind === ts.SyntaxKind.ElseKeyword) {
+                end = (node.parent as ts.IfStatement).elseStatement.end;
+            }
+            const endLine = this.sourceFile.getLineAndCharacterOfPosition(end).line;
+            line += 1;
+            while (!this.getMostEnclosingNodeForLine(line) && line <= endLine) {
+                comments.push(...this.getCommentsInLine(line));
+                line++;
+            }
+        }
+        return comments;
     }
 
     public getCommentsBelongingToLine(line: number): SourceComment[] {
@@ -228,6 +252,14 @@ export class SourceMap {
 
     public getAllComments(): SourceComment[] {
         return this.mergedComments;
+    }
+
+    private isConditionalBlockStart(node: ts.Node): boolean {
+        return node.kind === ts.SyntaxKind.ElseKeyword
+                || ts.isIfStatement(node)
+                || ts.isForStatement(node)
+                || ts.isDoStatement(node)
+                || ts.isWhileStatement(node);
     }
 
     private mergeAllComments(sourceFile: ts.SourceFile): SourceComment[] {
