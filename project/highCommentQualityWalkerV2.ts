@@ -93,7 +93,7 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
             if (cyclomaticComplexity) {
                 complexity += cyclomaticComplexity;
             }
-            complexity += this.getLocForNode(node);
+            complexity += this.getLocForNode(node) / 2;
         }
         if (ts.isCallLikeExpression(node) || ts.isBinaryExpression(node) ||
                 ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression (node)) {
@@ -185,7 +185,6 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
 
         for (let currentLine = startLine + 1; currentLine < endLine; ++currentLine) {
             const commentsInLine = this.sourceMap.getCommentsInLine(currentLine);
-            const correspondingComments = this.sourceMap.getCommentsBelongingToLine(currentLine);
             const enclosingNode = this.sourceMap.getMostEnclosingNodeForLine(currentLine);
             const currentLineText = nodeLines[currentLine - startLine];
             const noContentRegexp = /^\s*$/;
@@ -296,12 +295,13 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
     private requireCommentForLine(line: number, sourceMap: SourceMap, failureMessage?: string): boolean {
         // TODO: don't add another requirement instead of using an array if already present
         const enclosingNode = sourceMap.getMostEnclosingNodeForLine(line);
-        if (enclosingNode) {
-            line = sourceMap.sourceFile.getLineAndCharacterOfPosition(enclosingNode.getStart()).line;
+        if (!enclosingNode) {
+            return false;
         }
+        line = sourceMap.sourceFile.getLineAndCharacterOfPosition(enclosingNode.getStart()).line;
         const nearestComments = sourceMap.getCommentsWithDistanceClosestToLine(line);
         const commentStats = this.commentStats;
-        const qualityCommentPresent = nearestComments.some((commentDistance) => {
+        let qualityCommentPresent = nearestComments.some((commentDistance) => {
             const stats = commentStats.get(commentDistance.comment);
             const isAnnotation = (classification: ICommentClassification) => {
                 return classification.commentClass === CommentClass.Annotation && !classification.lines;
@@ -310,6 +310,33 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
             return stats.quality > CommentQuality.Low &&
                 commentDistance.distance <= stats.quality - CommentQuality.Low + 1;
         });
+
+        // second attempt: use parents ot get the distance to comments
+        if (!ts.isFunctionLike(enclosingNode)) {
+            let parentDepth = 0;
+            let comments = sourceMap.getCommentsBelongingToNode(enclosingNode);
+            let parentNode = enclosingNode;
+            while (comments.length === 0 && parentNode && !this.isFunctionOrMethod(parentNode)) {
+                parentNode = sourceMap.getNextEnclosingParentForNode(parentNode);
+                if (!parentNode) { break; }
+                comments = sourceMap.getCommentsBelongingToNode(parentNode);
+                parentDepth++;
+            }
+            if (comments && parentDepth < 3 && !qualityCommentPresent) {
+                qualityCommentPresent = comments.some((comment) => {
+                    const stats = commentStats.get(comment);
+                    const isAnnotation = (classification: ICommentClassification) => {
+                        return classification.commentClass === CommentClass.Annotation && !classification.lines;
+                    };
+                    if (stats.classifications.some(isAnnotation)) { return false; }
+                    return stats.quality > CommentQuality.Low;
+                });
+            }
+        }
+
+        // Best approach: Use a mixture of finding existing comments based on line distance,
+        // parent distance, and section start.
+
         if (!qualityCommentPresent) {
             failureMessage = failureMessage || "This line should be commented";
             if (this.requiredCommentLines.has(line)) {
@@ -323,6 +350,11 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
             return true;
         }
         return false;
+    }
+
+    // FunctionLikes that have been defined with corresponding keywords, as opposed to ArrowFunctions.
+    private isFunctionOrMethod(node: ts.Node): boolean {
+        return ts.isFunctionDeclaration(node) && ts.isMethodDeclaration(node);
     }
 
     private addFailuresForCommentRequirements() {
