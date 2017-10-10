@@ -51,3 +51,17 @@ describe("splitIntoNormalizedWords", () => {
     });
 
 });
+
+describe("getIntersection", () => {
+
+    it("should return the intersection of two string arrays", () => {
+        const intersection = Utils.getIntersection(["declaration", "commented"], ["declaration"]);
+        expect(intersection).to.deep.equal(["declaration"]);
+    });
+
+    it("should return an empty array if the two given arrays do not intersect", () => {
+        const intersection = Utils.getIntersection(["declaration", "commented"], ["stuff", 5]);
+        // tslint:disable-next-line:no-unused-expression
+        expect(intersection).to.be.empty;
+    });
+});

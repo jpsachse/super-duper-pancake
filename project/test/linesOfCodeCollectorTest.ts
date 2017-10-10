@@ -45,4 +45,8 @@ describe("visitNode", () => {
         expectLinesOfCodeForFunction(6, 5);
     });
 
+    it("should return 0 for a function without body", () => {
+        expectLinesOfCodeForFunction(7, 0);
+    });
+
 });

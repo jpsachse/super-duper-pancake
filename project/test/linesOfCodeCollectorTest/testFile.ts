@@ -39,3 +39,9 @@ function soManyBraces(): number {{
     }
     return bar;
 }}
+
+abstract class AnAbstractClass {
+
+    public abstract withAnAbstractFunction();
+
+}

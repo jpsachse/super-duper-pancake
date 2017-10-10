@@ -281,3 +281,53 @@ describe("getCommentsWithDistanceClosestToLine", () => {
     });
 
 });
+
+describe("getCommentsBelongingToNode", () => {
+
+    const map = createSourceMap("test/sourceMapTest/getCommentsBelongingToNode.ts");
+
+    function expectCommentAboveAndBelow(line: number) {
+        const node = map.getMostEnclosingNodeForLine(line);
+        const comments = map.getCommentsBelongingToNode(node);
+        const commentTexts = comments.map((c) => c.getSanitizedCommentText().text);
+        expect(commentTexts).to.deep.equal(["A comment above a special node",
+                                            "A comment below a special node"]);
+    }
+
+    it("should return comments in the line above the given node", () => {
+        const node = map.getMostEnclosingNodeForLine(2);
+        const comments = map.getCommentsBelongingToNode(node);
+        const commentTexts = comments.map((c) => c.getSanitizedCommentText().text);
+        expect(commentTexts).to.include("A function call with a comment above");
+    });
+
+    it("should return comments in the same line as the current node", () => {
+        const node = map.getMostEnclosingNodeForLine(2);
+        const comments = map.getCommentsBelongingToNode(node);
+        const commentTexts = comments.map((c) => c.getSanitizedCommentText().text);
+        expect(commentTexts).to.include("and a comment behind");
+    });
+
+    it("should not return comments below the current node normally", () => {
+        const node = map.getMostEnclosingNodeForLine(2);
+        const comments = map.getCommentsBelongingToNode(node);
+        const commentTexts = comments.map((c) => c.getSanitizedCommentText().text);
+        expect(commentTexts).to.not.include("And a comment below");
+    });
+
+    it("should return comments in the line below the current node if it's an if, else, for, do, while", () => {
+        expectCommentAboveAndBelow(6);
+        expectCommentAboveAndBelow(12);
+        expectCommentAboveAndBelow(18);
+        expectCommentAboveAndBelow(24);
+        expectCommentAboveAndBelow(28);
+    });
+
+    it("should not return comments below the node if another node is in a line in between", () => {
+        const node = map.getMostEnclosingNodeForLine(33);
+        const comments = map.getCommentsBelongingToNode(node);
+        const commentTexts = comments.map((c) => c.getSanitizedCommentText().text);
+        expect(commentTexts).to.deep.equal(["A comment above a special node"]);
+    });
+
+});
