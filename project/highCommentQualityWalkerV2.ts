@@ -121,15 +121,11 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
                 });
                 locComplexity = this.locCollector.getLoc(elseKeyword);
             }
-            if (locComplexity) {
-                return locComplexity;
-            }
+            return locComplexity;
         }
         if (ts.isBlock(node)) {
             const locComplexity = this.locCollector.getLoc(node.parent);
-            if (locComplexity) {
-                return locComplexity;
-            }
+            return locComplexity;
         }
         return 1;
     }

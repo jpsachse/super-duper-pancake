@@ -24,6 +24,7 @@ export class LinesOfCodeCollector implements IMetricCollector {
         } else {
             return;
         }
+        if (!codeNode) { return; }
 
         const sourceFile = codeNode.getSourceFile();
         const textLines = codeNode.getText(sourceFile).split("\n");
@@ -47,8 +48,8 @@ export class LinesOfCodeCollector implements IMetricCollector {
         this.linesOfCode.set(node, linesOfCode);
     }
 
-    public getLoc(node: ts.Node): number | undefined {
-        return this.linesOfCode.get(node);
+    public getLoc(node: ts.Node): number {
+        return this.linesOfCode.get(node) || 0;
     }
 
     private containsOnlyBraces(text: string): boolean {
