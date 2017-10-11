@@ -1,0 +1,10 @@
+{
+    "extends": "tslint:recommended",
+    "rulesDirectory": [
+        "."
+    ],
+    "rules": {
+        "high-comment-quality": { "severity": "warning" },
+        "object-literal-sort-keys": false
+    }
+}
