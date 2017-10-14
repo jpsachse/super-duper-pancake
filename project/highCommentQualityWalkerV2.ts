@@ -90,6 +90,9 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
         // calculate complexity of current line
         // get complexities of children
         // add to complexity of line
+        if (ts.isIterationStatement(node, false)) {
+            return {complexity: this.analyzeIterationStatement(node), expressionNestingDepth: 0};
+        }
         if (ts.isIfStatement(node)) {
             return {complexity: this.analyzeIfStatement(node), expressionNestingDepth: 0};
         }
@@ -138,6 +141,24 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
             return locComplexity;
         }
         return 1;
+    }
+
+    private analyzeIterationStatement(node: ts.IterationStatement): number {
+        const statementComplexity = this.analyze(node.statement).complexity;
+        let conditionComplexity = 0;
+        if (ts.isForInStatement(node) || ts.isForOfStatement(node)) {
+            conditionComplexity = this.analyze(node.expression).complexity
+                    + this.analyze(node.initializer).complexity;
+        } else if (ts.isWhileStatement(node) || ts.isDoStatement(node)) {
+            conditionComplexity = this.analyze(node.expression).complexity;
+        } else if (ts.isForStatement(node)) {
+            conditionComplexity = this.analyze(node.initializer).complexity
+                    + this.analyze(node.condition).complexity
+                    + this.analyze(node.incrementor).complexity;
+        }
+        const totalComplexity = statementComplexity + conditionComplexity;
+        this.nodeComplexities.set(node, totalComplexity);
+        return totalComplexity;
     }
 
     private analyzeIfStatement(node: ts.IfStatement): number {
