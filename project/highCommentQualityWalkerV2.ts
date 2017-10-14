@@ -22,6 +22,11 @@ interface ILineComplexity {
     complexity: number;
 }
 
+interface IAnalysisResult {
+    complexity: number;
+    expressionNestingDepth: number;
+}
+
 export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
 
     public static sectionComplexityThreshold = 7;
@@ -79,14 +84,14 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
         });
     }
 
-    private analyze(node?: ts.Node): number {
-        if (!node) { return 0; }
+    private analyze(node?: ts.Node): IAnalysisResult {
+        if (!node) { return {complexity: 0, expressionNestingDepth: 0}; }
         let complexity = 0;
         // calculate complexity of current line
         // get complexities of children
         // add to complexity of line
         if (ts.isIfStatement(node)) {
-            return this.analyzeIfStatement(node);
+            return {complexity: this.analyzeIfStatement(node), expressionNestingDepth: 0};
         }
         if (ts.isBlock(node)) {
             const cyclomaticComplexity = this.ccCollector.getComplexity(node);
@@ -95,19 +100,24 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
             }
             complexity += this.getLocForNode(node) / 2;
         }
+        let maxChildExpressionNestingDepth = 0;
+        node.forEachChild((child) => {
+            const childComplexity = this.analyze(child);
+            maxChildExpressionNestingDepth = Math.max(maxChildExpressionNestingDepth,
+                                                      childComplexity.expressionNestingDepth);
+            complexity += childComplexity.complexity;
+        });
         if (ts.isCallLikeExpression(node) || ts.isBinaryExpression(node) ||
                 ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression (node)) {
-            complexity += 0.1;
+            complexity += 0.5 * Math.pow(2, maxChildExpressionNestingDepth);
+            maxChildExpressionNestingDepth++;
+        } else {
+            maxChildExpressionNestingDepth = 0;
         }
-        node.forEachChild((child) => {
-            let childComplexity = 0;
-            childComplexity += this.analyze(child);
-            complexity += childComplexity;
-        });
-        if (Utils.isDeclaration(node) || Utils.isStatement(node) || ts.isFunctionLike(node)) {
-            this.nodeComplexities.set(node, complexity);
-        }
-        return complexity;
+        // if (Utils.isDeclaration(node) || Utils.isStatement(node) || ts.isFunctionLike(node)) {
+        this.nodeComplexities.set(node, complexity);
+        // }
+        return {complexity, expressionNestingDepth: maxChildExpressionNestingDepth};
     }
 
     private getLocForNode(node: ts.Node): number {
@@ -116,7 +126,7 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
             if (node.parent.thenStatement === node) {
                 locComplexity = this.locCollector.getLoc(node.parent);
             } else {
-                const elseKeyword = node.getChildren().find((child) => {
+                const elseKeyword = node.parent.getChildren().find((child) => {
                     return child.kind === ts.SyntaxKind.ElseKeyword;
                 });
                 locComplexity = this.locCollector.getLoc(elseKeyword);
@@ -131,16 +141,18 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
     }
 
     private analyzeIfStatement(node: ts.IfStatement): number {
-        const thenComplexity = this.analyze(node.thenStatement);
-        const elseComplexity = this.analyze(node.elseStatement);
+        const thenComplexity = this.analyze(node.thenStatement).complexity;
+        const elseComplexity = this.analyze(node.elseStatement).complexity;
+        const conditionComplexity = this.analyze(node.expression).complexity;
         const children = node.getChildren();
         const ifKeyword = children.find((child) => child.kind === ts.SyntaxKind.IfKeyword);
-        this.nodeComplexities.set(ifKeyword, thenComplexity);
         if (elseComplexity > 0) {
             const elseKeyword = children.find((child) => child.kind === ts.SyntaxKind.ElseKeyword);
             this.nodeComplexities.set(elseKeyword, elseComplexity);
         }
-        return thenComplexity + elseComplexity;
+        const ifComplexity = thenComplexity + conditionComplexity;
+        this.nodeComplexities.set(ifKeyword, ifComplexity);
+        return ifComplexity;
     }
 
     private addFailureForClassification(comment: SourceComment, classification: ICommentClassification) {
@@ -329,9 +341,6 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
                 });
             }
         }
-
-        // Best approach: Use a mixture of finding existing comments based on line distance,
-        // parent distance, and section start.
 
         if (!qualityCommentPresent) {
             failureMessage = failureMessage || "This line should be commented";
