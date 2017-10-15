@@ -149,6 +149,9 @@ export class CommentQualityEvaluator {
                                      quality: CommentQuality, threshold: number): CommentQuality {
         const usefulCommentParts = this.normaliseWords(
                     this.filterCommonWords(Utils.splitIntoNormalizedWords(comment))).sort();
+        if (usefulCommentParts.length === 0) {
+            return this.lowerQuality(quality);
+        }
         const nameParts = this.normaliseWords(
                 this.filterCommonWords(Utils.splitIntoNormalizedWords(nodeName))).sort();
         const intersection = Utils.getIntersection(nameParts, usefulCommentParts);
