@@ -5,6 +5,10 @@ import Utils from "./utils";
 
 export class AnnotationMatcher {
 
+    /**
+     * Assigns comment classes to the given comment based on its contents.
+     * @param comment The comment to be classified.
+     */
     public classify(comment: SourceComment): ICommentClassification[] {
         const matchedLines: number[] = [];
         const commentLines = comment.getSanitizedCommentLines();
