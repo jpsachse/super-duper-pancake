@@ -152,13 +152,6 @@ export class SourceMap {
         if (lineStart === lineEnd || lineText.replace(/\s*/, "").length === 0) {
             return;
         }
-        // TODO: cope with blocks ending at the end of a line of code, which currently results in
-        // returning the wrong node (the statement corresponding to the enclosing block and not
-        // the actual node that started the corresponding line).
-        // Easy possible fix: while the fetched node from the array is a closing bracket, reduce
-        // the used index, until a non-bracket node is found (if any) and then use that to find a parent.
-        // This could also solve the problem of closing brackets resulting in a unwanted recalculation
-        // of complexity scores for block-starting lines.
         const nodes = this.nodesOfLine.get(line);
         if (!nodes || nodes.length === 0) { return; }
         let index = 0;

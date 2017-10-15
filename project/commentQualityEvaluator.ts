@@ -51,6 +51,7 @@ export class CommentQualityEvaluator {
 
     private assessInlineComment(comment: SourceComment, nextNode: ts.Node, sourceMap: SourceMap): CommentQuality {
         let quality = CommentQuality.Low;
+        // TODO: add meaningful implementation
         quality = this.higherQuality(quality);
         return quality;
     }
@@ -66,8 +67,6 @@ export class CommentQualityEvaluator {
         if (jsDocs.length > 0) {
             commentText = jsDocs.map((jsDoc) => jsDoc.comment).join("\n");
             quality = this.assessJSDocComment(jsDocs[jsDocs.length - 1], declaration, quality);
-            // TODO: throw exception when there is more than one associated jsdoc comment
-            // or handle it gracefully by using the longest one
         } else {
             commentText = comment.getSanitizedCommentText().text;
         }

@@ -82,6 +82,7 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
                 this.addFailure(comment.pos, end, "Low comment quality: " + CommentQuality[quality]);
             }
         });
+        // TODO: smooth license comment classifications (add classification to comments between 2 license comments)
     }
 
     private analyze(node?: ts.Node): IAnalysisResult {
