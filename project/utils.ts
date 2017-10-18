@@ -62,6 +62,14 @@ export default class Utils {
                 node.kind === ts.SyntaxKind.TypeParameter);
     }
 
+    public static isJSDocTag(node: ts.Node): node is ts.JSDocTag {
+        return node.kind === ts.SyntaxKind.JSDocTag;
+    }
+
+    public static trimTrailingSpace(aString: string): string {
+        return aString.replace(/\s+$/, "");
+    }
+
     /**
      * Gets the intersection of two arrays
      * @param first First array

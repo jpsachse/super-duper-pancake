@@ -85,6 +85,77 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
         // TODO: smooth license comment classifications (add classification to comments between 2 license comments)
     }
 
+    private filterLinesInUnacceptableContext(classification: ICommentClassification, comment: SourceComment): number[] {
+        if (!classification.lines) {
+            throw new Error("Need classification lines to filter!");
+        }
+        const unacceptableLines = classification.lines;
+        const commentLines = comment.getSanitizedCommentLines();
+        const jsDocs = comment.getCompleteComment().jsDoc;
+        let currentIndex = 0;
+        jsDocs.forEach((jsDoc: ts.JSDoc) => {
+            while (currentIndex < unacceptableLines.length) {
+                const codeLineNumber = unacceptableLines[currentIndex];
+                if (this.isEscapedCode(commentLines[codeLineNumber].text, jsDoc.comment)) {
+                    unacceptableLines.splice(currentIndex, 1);
+                } else {
+                    currentIndex++;
+                }
+            }
+            jsDoc.forEachChild((child: ts.Node) => {
+                currentIndex = 0;
+                while (currentIndex < unacceptableLines.length) {
+                    if (Utils.isJSDocTag(child)) {
+                        const codeLineNumber = unacceptableLines[currentIndex];
+                        const tagStartLine = this.sourceFile.getLineAndCharacterOfPosition(child.pos).line;
+                        const tagEndPos = child.end + child.comment.length;
+                        const tagEndLine = this.sourceFile.getLineAndCharacterOfPosition(tagEndPos).line;
+                        const codeText = commentLines[codeLineNumber].text;
+                        if (tagStartLine > codeLineNumber || tagEndLine < codeLineNumber) {
+                            currentIndex++;
+                            continue;
+                        }
+                        if (child.tagName.text === "example" && child.comment.includes(codeText)) {
+                            unacceptableLines.splice(currentIndex, 1);
+                        } else if (this.isEscapedCode(commentLines[codeLineNumber].text, child.comment)) {
+                            unacceptableLines.splice(currentIndex, 1);
+                        } else {
+                            currentIndex++;
+                        }
+                    } else {
+                        currentIndex++;
+                    }
+                }
+            });
+        });
+        if (jsDocs.length === 0) {
+            currentIndex = 0;
+            const commentText = comment.getSanitizedCommentText().text;
+            while (currentIndex < unacceptableLines.length) {
+                const codeLineNumber = unacceptableLines[currentIndex];
+                if (this.isEscapedCode(commentLines[codeLineNumber].text, commentText)) {
+                    unacceptableLines.splice(currentIndex, 1);
+                } else {
+                    currentIndex++;
+                }
+            }
+        }
+        return unacceptableLines;
+    }
+
+    private isEscapedCode(codeText: string, commentText: string): boolean {
+        const acceptableRegex = /[``]{3,}[^``]*[``]{3,}/g;
+        const matches = commentText.match(acceptableRegex);
+        if (matches) {
+            for (const key in matches) {
+                if (matches.hasOwnProperty(key) && matches[key].toString().includes(codeText)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     private analyze(node?: ts.Node): IAnalysisResult {
         if (!node) { return {complexity: 0, expressionNestingDepth: 0}; }
         let complexity = 0;
@@ -184,7 +255,8 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
             const end = comment.end;
             this.addFailure(pos, end, failureMessage);
         } else {
-            classification.lines.forEach( (lineNumber) => {
+            const lines = this.filterLinesInUnacceptableContext(classification, comment);
+            lines.forEach( (lineNumber) => {
                 this.addFailure(comment.getPosOfLine(lineNumber),
                                 comment.getEndOfLine(lineNumber),
                                 failureMessage);
