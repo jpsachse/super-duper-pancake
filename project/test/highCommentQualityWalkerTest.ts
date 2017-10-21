@@ -59,12 +59,25 @@ describe("filterLinesInUnacceptableContext", () => {
         const codeClassification = commentClassification[1].classifications.find((c) => {
             return c.commentClass === CommentClass.Code;
         });
-        console.log(codeClassification);
         const unacceptableLines = walker["filterLinesInUnacceptableContext"](codeClassification, comment);
-        console.log(unacceptableLines);
         expect(unacceptableLines).to.not.include(3);
         expect(unacceptableLines).to.not.include(4);
         expect(unacceptableLines).to.not.include(5);
+    });
+
+    it("should not filter code that is not escaped in a normal comment", () => {
+        const walker = createWalker("test/highCommentQualityWalkerTest/filterLinesInUnacceptableContext.ts");
+        const commentStats = walker["commentStats"];
+        const iterator = commentStats.entries();
+        iterator.next();
+        const commentClassification = iterator.next().value;
+        const comment = commentClassification[0];
+        const codeClassification = commentClassification[1].classifications.find((c) => {
+            return c.commentClass === CommentClass.Code;
+        });
+        const unacceptableLines = walker["filterLinesInUnacceptableContext"](codeClassification, comment);
+        expect(unacceptableLines).to.include(1);
+        expect(unacceptableLines).to.include(6);
     });
 
     it("should not filter code that is not escaped or in @example tags", () => {

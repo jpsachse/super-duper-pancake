@@ -89,14 +89,15 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
         if (!classification.lines) {
             throw new Error("Need classification lines to filter!");
         }
-        const unacceptableLines = classification.lines;
+        const unacceptableLines = classification.lines.slice(0);
         const commentLines = comment.getSanitizedCommentLines();
         const jsDocs = comment.getCompleteComment().jsDoc;
         let currentIndex = 0;
         jsDocs.forEach((jsDoc: ts.JSDoc) => {
             while (currentIndex < unacceptableLines.length) {
                 const codeLineNumber = unacceptableLines[currentIndex];
-                if (this.isEscapedCode(commentLines[codeLineNumber].text, jsDoc.comment)) {
+                let commentPos = commentLines[codeLineNumber].pos - jsDoc.pos;
+                if (this.isEscapedCode(commentLines[codeLineNumber].text, jsDoc.comment, commentPos)) {
                     unacceptableLines.splice(currentIndex, 1);
                 } else {
                     currentIndex++;
@@ -115,9 +116,10 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
                             currentIndex++;
                             continue;
                         }
+                        const commentPos = commentLines[codeLineNumber].pos - child.pos;
                         if (child.tagName.text === "example" && child.comment.includes(codeText)) {
                             unacceptableLines.splice(currentIndex, 1);
-                        } else if (this.isEscapedCode(commentLines[codeLineNumber].text, child.comment)) {
+                        } else if (this.isEscapedCode(commentLines[codeLineNumber].text, child.comment, commentPos)) {
                             unacceptableLines.splice(currentIndex, 1);
                         } else {
                             currentIndex++;
@@ -133,7 +135,8 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
             const commentText = comment.getSanitizedCommentText().text;
             while (currentIndex < unacceptableLines.length) {
                 const codeLineNumber = unacceptableLines[currentIndex];
-                if (this.isEscapedCode(commentLines[codeLineNumber].text, commentText)) {
+                const commentPos = commentLines[codeLineNumber].pos - comment.pos;
+                if (this.isEscapedCode(commentLines[codeLineNumber].text, commentText, commentPos)) {
                     unacceptableLines.splice(currentIndex, 1);
                 } else {
                     currentIndex++;
@@ -143,15 +146,14 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
         return unacceptableLines;
     }
 
-    private isEscapedCode(codeText: string, commentText: string): boolean {
+    private isEscapedCode(codeText: string, commentText: string, codePosition: number): boolean {
+        if (codePosition < 0 || codePosition > commentText.length) { return false; }
         const acceptableRegex = /[``]{3,}[^``]*[``]{3,}/g;
-        const matches = commentText.match(acceptableRegex);
-        if (matches) {
-            for (const key in matches) {
-                if (matches.hasOwnProperty(key) && matches[key].toString().includes(codeText)) {
-                    return true;
-                }
-            }
+        let match = acceptableRegex.exec(commentText);
+        while (match) {
+            if (match.index > codePosition) { return false; }
+            if (match.toString().includes(codeText)) { return true; }
+            match = acceptableRegex.exec(commentText);
         }
         return false;
     }

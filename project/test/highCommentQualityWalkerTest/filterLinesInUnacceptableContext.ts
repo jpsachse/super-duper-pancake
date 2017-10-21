@@ -7,6 +7,8 @@
  * this.is.also.not.allowed();
  * @example this.one.as.well();
  * this.is.also.okay();
+ * @param this this.is.not.okay();
+ * this.neither();
  */
 function thisIsHereSoThatICanFindTheComment() {}
 
@@ -16,3 +18,5 @@ function thisIsHereSoThatICanFindTheComment() {}
 // ```
 // console.log();
 // ```
+// console.log()
+function thisIsHereSoThatICanFindTheCommentv2() {}
