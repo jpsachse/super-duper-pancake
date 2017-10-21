@@ -26,4 +26,8 @@ describe("classify", () => {
     it("should create code annotations with lines listed if not all lines are code", () => {
         DetectorTestHelper.shouldClassifyPartialCodeComments(codeDetector);
     });
+
+    it("should classify escaped code in comments", () => {
+        DetectorTestHelper.shouldClassifyEscapedCode(codeDetector);
+    });
 });

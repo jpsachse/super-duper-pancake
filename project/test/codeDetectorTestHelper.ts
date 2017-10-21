@@ -41,3 +41,16 @@ export function shouldClassifyPartialCodeComments(detector: CodeDetector) {
     expect(classifications[0].lines).to.have.lengthOf(4);
     expect(classifications[0].lines).to.deep.equal([1, 2, 3, 4]);
 }
+
+export function shouldClassifyEscapedCode(detector: CodeDetector) {
+    const firstPart  = "// Here is some more not allowed code:";
+    const secondPart = "// console.log();";
+    const thirdPart  = "// ```";
+    const fourthPart = "// console.log();";
+    const fifthPart  = "// ```";
+    const comment = buildComment(firstPart, secondPart, thirdPart, fourthPart, fifthPart);
+    const classifications = detector.classify(comment);
+    expect(classifications).to.have.lengthOf(1);
+    expect(classifications[0].lines).to.have.lengthOf(4);
+    expect(classifications[0].lines).to.deep.equal([1, 2, 3, 4]);
+}

@@ -4,10 +4,10 @@ import * as ts from "typescript";
 import { LinesOfCodeCollector } from "../linesOfCodeCollector";
 import { createSourceMap } from "./testHelper";
 
-describe("visitNode", () => {
+const sourceMap = createSourceMap("test/linesOfCodeCollectorTest/testFile.ts");
+const collector = new LinesOfCodeCollector();
 
-    const sourceMap = createSourceMap("test/linesOfCodeCollectorTest/testFile.ts");
-    const collector = new LinesOfCodeCollector();
+describe("visitNode", () => {
 
     function expectLinesOfCodeForFunction(functionIndex: number, expectedLoc: number) {
         const node = sourceMap.getAllFunctionLikes()[functionIndex];
@@ -45,8 +45,23 @@ describe("visitNode", () => {
         expectLinesOfCodeForFunction(6, 5);
     });
 
+    it("should not calculate LOC for a function without body", () => {
+        const node = sourceMap.getAllFunctionLikes()[7];
+        collector.visitNode(node);
+        // tslint:disable-next-line:no-string-literal
+        const locMap = collector["linesOfCode"] as Map<ts.Node, number>;
+        // tslint:disable-next-line:no-unused-expression
+        expect(locMap.get(node)).to.be.undefined;
+    });
+
+});
+
+describe("getLoc", () => {
+
     it("should return 0 for a function without body", () => {
-        expectLinesOfCodeForFunction(7, 0);
+        const node = sourceMap.getAllFunctionLikes()[7];
+        collector.visitNode(node);
+        expect(collector.getLoc(node)).to.equal(0);
     });
 
 });
