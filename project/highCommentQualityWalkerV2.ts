@@ -85,9 +85,15 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
         // TODO: smooth license comment classifications (add classification to comments between 2 license comments)
     }
 
-    private filterLinesInUnacceptableContext(classification: ICommentClassification, comment: SourceComment): number[] {
-        if (!classification.lines) {
-            throw new Error("Need classification lines to filter!");
+    /**
+     * Filters lines of a code classification that lie within a context where code is allowed in a comment.
+     * This includes lines that are escaped with ``` and code that is placed in the example JSDoc tag.
+     * @param classification A code classification including a list of lines that are code.
+     * @param comment The comment that has been classified to contain code.
+     */
+    private getUnescapedCodeLines(classification: ICommentClassification, comment: SourceComment): number[] {
+        if (!classification.lines || classification.commentClass !== CommentClass.Code) {
+            throw new Error("Need code classification with classification lines to filter!");
         }
         const unacceptableLines = classification.lines.slice(0);
         const commentLines = comment.getSanitizedCommentLines();
@@ -95,9 +101,9 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
         let currentIndex = 0;
         jsDocs.forEach((jsDoc: ts.JSDoc) => {
             while (currentIndex < unacceptableLines.length) {
-                const codeLineNumber = unacceptableLines[currentIndex];
-                let commentPos = commentLines[codeLineNumber].pos - jsDoc.pos;
-                if (this.isEscapedCode(commentLines[codeLineNumber].text, jsDoc.comment, commentPos)) {
+                const codeLine = commentLines[unacceptableLines[currentIndex]];
+                const commentPos = codeLine.pos - jsDoc.pos;
+                if (this.isEscapedCode(codeLine.text, jsDoc.comment, commentPos)) {
                     unacceptableLines.splice(currentIndex, 1);
                 } else {
                     currentIndex++;
@@ -106,24 +112,24 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
             jsDoc.forEachChild((child: ts.Node) => {
                 currentIndex = 0;
                 while (currentIndex < unacceptableLines.length) {
-                    if (Utils.isJSDocTag(child)) {
-                        const codeLineNumber = unacceptableLines[currentIndex];
-                        const tagStartLine = this.sourceFile.getLineAndCharacterOfPosition(child.pos).line;
-                        const tagEndPos = child.end + child.comment.length;
-                        const tagEndLine = this.sourceFile.getLineAndCharacterOfPosition(tagEndPos).line;
-                        const codeText = commentLines[codeLineNumber].text;
-                        if (tagStartLine > codeLineNumber || tagEndLine < codeLineNumber) {
-                            currentIndex++;
-                            continue;
-                        }
-                        const commentPos = commentLines[codeLineNumber].pos - child.pos;
-                        if (child.tagName.text === "example" && child.comment.includes(codeText)) {
-                            unacceptableLines.splice(currentIndex, 1);
-                        } else if (this.isEscapedCode(commentLines[codeLineNumber].text, child.comment, commentPos)) {
-                            unacceptableLines.splice(currentIndex, 1);
-                        } else {
-                            currentIndex++;
-                        }
+                    if (!Utils.isJSDocTag(child)) {
+                        currentIndex++;
+                        continue;
+                    }
+                    const codeLineNumber = unacceptableLines[currentIndex];
+                    const tagStartLine = this.sourceFile.getLineAndCharacterOfPosition(child.pos).line;
+                    const tagEndPos = child.end + child.comment.length;
+                    const tagEndLine = this.sourceFile.getLineAndCharacterOfPosition(tagEndPos).line;
+                    const codeText = commentLines[codeLineNumber].text;
+                    if (tagStartLine > codeLineNumber || tagEndLine < codeLineNumber) {
+                        currentIndex++;
+                        continue;
+                    }
+                    const commentPos = commentLines[codeLineNumber].pos - child.pos;
+                    if (child.tagName.text === "example" && child.comment.includes(codeText)) {
+                        unacceptableLines.splice(currentIndex, 1);
+                    } else if (this.isEscapedCode(commentLines[codeLineNumber].text, child.comment, commentPos)) {
+                        unacceptableLines.splice(currentIndex, 1);
                     } else {
                         currentIndex++;
                     }
@@ -257,7 +263,7 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
             const end = comment.end;
             this.addFailure(pos, end, failureMessage);
         } else {
-            const lines = this.filterLinesInUnacceptableContext(classification, comment);
+            const lines = this.getUnescapedCodeLines(classification, comment);
             lines.forEach( (lineNumber) => {
                 this.addFailure(comment.getPosOfLine(lineNumber),
                                 comment.getEndOfLine(lineNumber),
