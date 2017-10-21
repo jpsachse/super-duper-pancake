@@ -425,11 +425,10 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
         if (!ts.isFunctionLike(enclosingNode)) {
             let parentDepth = 0;
             let comments = sourceMap.getCommentsBelongingToNode(enclosingNode);
-            let parentNode = enclosingNode;
-            while (comments.length === 0 && parentNode && !this.isFunctionOrMethod(parentNode)) {
-                parentNode = sourceMap.getNextEnclosingParentForNode(parentNode);
-                if (!parentNode) { break; }
+            let parentNode = sourceMap.getNextEnclosingParentForNode(enclosingNode) || enclosingNode;
+            while (comments.length === 0 && parentNode && !this.isFunctionOrMethodPart(parentNode)) {
                 comments = sourceMap.getCommentsBelongingToNode(parentNode);
+                parentNode = sourceMap.getNextEnclosingParentForNode(parentNode);
                 parentDepth++;
             }
             if (comments && parentDepth < 3 && !qualityCommentPresent) {
@@ -459,9 +458,15 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
         return false;
     }
 
-    // FunctionLikes that have been defined with corresponding keywords, as opposed to ArrowFunctions.
-    private isFunctionOrMethod(node: ts.Node): boolean {
-        return ts.isFunctionDeclaration(node) && ts.isMethodDeclaration(node);
+    /**
+     * Tests whether a node is a FunctionLike that has been defined with corresponding keywords,
+     * as opposed to ArrowFunctions. Also returns true for the ts.Block-type nodes belonging to these
+     * FunctionLikes.
+     * @param node The node to be tested.
+     */
+    private isFunctionOrMethodPart(node: ts.Node): boolean {
+        return ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node) ||
+                (ts.isBlock(node) && (ts.isFunctionDeclaration(node.parent) || ts.isMethodDeclaration(node.parent)));
     }
 
     private addFailuresForCommentRequirements() {
