@@ -374,25 +374,33 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
         return 0;
     }
 
+    /**
+     * Adds comment requirements to a part of code. Returns true, if a comment requirement has been added.
+     * @param complexity The accumulated complexity of the section.
+     * @param threshold The maximum complexity value that is allowed before a comment is required.
+     * @param sectionStartLine The line in which the section starts and where the comment requirement is added.
+     * @param lineComplexities Complexities for the next smaller unit (lines for sections, sections for functions).
+     * @param lineThreshold The maximum complexity value for lines that is allowed before a comment is required.
+     */
     private enforceCommentRequirementForSection(complexity: number, threshold: number, sectionStartLine: number,
                                                 lineComplexities: PriorityQueue<ILineComplexity>,
                                                 lineThreshold: number) {
-        if (complexity > threshold) {
-            if (!this.requireCommentForLine(sectionStartLine, this.sourceMap, "sectionstart: " + complexity)) {
-                const findCommentRequirementLocation = (): boolean => {
-                    const highestComplexity = lineComplexities.dequeue();
-                    if (!highestComplexity || highestComplexity.complexity < lineThreshold) {
-                        return true;
-                    }
-                    const reason = "most complex: " + highestComplexity.complexity + " - total: " + complexity;
-                    return this.requireCommentForLine(highestComplexity.line, this.sourceMap, reason);
-                };
-                // tslint:disable-next-line:no-empty
-                while (!findCommentRequirementLocation()) {}
-            }
-            return true;
+        if (complexity < threshold) {
+            return false;
         }
-        return false;
+        if (!this.requireCommentForLine(sectionStartLine, this.sourceMap, "sectionstart: " + complexity)) {
+            const findCommentRequirementLocation = (): boolean => {
+                const highestComplexity = lineComplexities.dequeue();
+                if (!highestComplexity || highestComplexity.complexity < lineThreshold) {
+                    return true;
+                }
+                const reason = "most complex: " + highestComplexity.complexity + " - total: " + complexity;
+                return this.requireCommentForLine(highestComplexity.line, this.sourceMap, reason);
+            };
+            // tslint:disable-next-line:no-empty
+            while (!findCommentRequirementLocation()) {}
+        }
+        return true;
     }
 
     /**
@@ -408,6 +416,7 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
         if (!enclosingNode) {
             return false;
         }
+        // Try to find comments that are (spatially) close to the line that requires a comment
         line = sourceMap.sourceFile.getLineAndCharacterOfPosition(enclosingNode.getStart()).line;
         const nearestComments = sourceMap.getCommentsWithDistanceClosestToLine(line);
         const commentStats = this.commentStats;
@@ -421,7 +430,7 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
                 commentDistance.distance <= stats.quality - CommentQuality.Low + 1;
         });
 
-        // second attempt: use parents ot get the distance to comments
+        // Try to find comments that are close in terms of nesting-level
         if (!ts.isFunctionLike(enclosingNode)) {
             let parentDepth = 0;
             let comments = sourceMap.getCommentsBelongingToNode(enclosingNode);
@@ -443,6 +452,7 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
             }
         }
 
+        // Add a comment if nothing has been found before
         if (!qualityCommentPresent) {
             failureMessage = failureMessage || "This line should be commented";
             if (this.requiredCommentLines.has(line)) {
@@ -469,6 +479,10 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
                 (ts.isBlock(node) && (ts.isFunctionDeclaration(node.parent) || ts.isMethodDeclaration(node.parent)));
     }
 
+    /**
+     * Adds tslint failures for comment requirements. Nodes with requirements, whose parent also has
+     * a requirement, are skipped.
+     */
     private addFailuresForCommentRequirements() {
         this.requiredCommentLines.forEach((reasons, line) => {
             const node = this.sourceMap.getMostEnclosingNodeForLine(line);
