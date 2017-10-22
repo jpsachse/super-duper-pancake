@@ -120,8 +120,10 @@ export class CommentQualityEvaluator {
         // Lower the comment quality if parameters are missing from the JSDoc
         let commentedParameterCount = 0;
         let lowQualityCommentParameterCount = 0;
+        let parameterCount = 0;
         declaration.forEachChild((child) => {
             if (ts.isParameter(child)) {
+                parameterCount++;
                 const parameterComment = jsDocParameterComments.get(child.name.getText());
                 if (!parameterComment) {
                     quality = this.lowerQuality(quality);
@@ -136,10 +138,15 @@ export class CommentQualityEvaluator {
                 }
             }
         });
-        if (lowQualityCommentParameterCount >= commentedParameterCount) {
-            quality = this.lowerQuality(quality);
-        } else if (lowQualityCommentParameterCount < 0) {
-            quality = this.higherQuality(quality);
+        if (parameterCount > 0) {
+            if (lowQualityCommentParameterCount >= commentedParameterCount) {
+                quality = this.lowerQuality(quality);
+            } else if (lowQualityCommentParameterCount < 0) {
+                quality = this.higherQuality(quality);
+            }
+            if (commentedParameterCount < parameterCount) {
+                quality = this.lowerQuality(quality);
+            }
         }
         return quality;
     }
