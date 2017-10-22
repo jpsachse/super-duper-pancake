@@ -31,7 +31,7 @@ describe("filterLinesInUnacceptableContext", () => {
         const codeClassification = commentClassification[1].classifications.find((c) => {
             return c.commentClass === CommentClass.Code;
         });
-        const unacceptableLines = walker["filterLinesInUnacceptableContext"](codeClassification, comment);
+        const unacceptableLines = walker["getUnescapedCodeLines"](codeClassification, comment);
         expect(unacceptableLines).to.not.include(7);
         expect(unacceptableLines).to.not.include(8);
     });
@@ -43,7 +43,7 @@ describe("filterLinesInUnacceptableContext", () => {
         const codeClassification = commentClassification[1].classifications.find((c) => {
             return c.commentClass === CommentClass.Code;
         });
-        const unacceptableLines = walker["filterLinesInUnacceptableContext"](codeClassification, comment);
+        const unacceptableLines = walker["getUnescapedCodeLines"](codeClassification, comment);
         expect(unacceptableLines).to.not.include(3);
         expect(unacceptableLines).to.not.include(4);
         expect(unacceptableLines).to.not.include(5);
@@ -59,7 +59,7 @@ describe("filterLinesInUnacceptableContext", () => {
         const codeClassification = commentClassification[1].classifications.find((c) => {
             return c.commentClass === CommentClass.Code;
         });
-        const unacceptableLines = walker["filterLinesInUnacceptableContext"](codeClassification, comment);
+        const unacceptableLines = walker["getUnescapedCodeLines"](codeClassification, comment);
         expect(unacceptableLines).to.not.include(3);
         expect(unacceptableLines).to.not.include(4);
         expect(unacceptableLines).to.not.include(5);
@@ -75,7 +75,7 @@ describe("filterLinesInUnacceptableContext", () => {
         const codeClassification = commentClassification[1].classifications.find((c) => {
             return c.commentClass === CommentClass.Code;
         });
-        const unacceptableLines = walker["filterLinesInUnacceptableContext"](codeClassification, comment);
+        const unacceptableLines = walker["getUnescapedCodeLines"](codeClassification, comment);
         expect(unacceptableLines).to.include(1);
         expect(unacceptableLines).to.include(6);
     });
@@ -87,7 +87,7 @@ describe("filterLinesInUnacceptableContext", () => {
         const codeClassification = commentClassification[1].classifications.find((c) => {
             return c.commentClass === CommentClass.Code;
         });
-        const unacceptableLines = walker["filterLinesInUnacceptableContext"](codeClassification, comment);
+        const unacceptableLines = walker["getUnescapedCodeLines"](codeClassification, comment);
         expect(unacceptableLines).to.include(2);
         expect(unacceptableLines).to.include(6);
     });
