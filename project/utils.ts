@@ -7,6 +7,8 @@ export default class Utils {
 
     public static commentOnlyLineRegxp = /^\s*(\/\/|\/\*)/gm;
 
+    public static newLineChar = process.platform.includes("win") ? "\r\n" : "\n";
+
     public static createRange(start: number, end: number) {
         return Array.from({length: end - start + 1}, (value, key) => key + start);
     }

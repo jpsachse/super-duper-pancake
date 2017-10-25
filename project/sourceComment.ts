@@ -29,11 +29,17 @@ export class SourceComment implements TextRange {
     }
 
     public addPart(pos: number, end: number, text: string, jsDoc: JSDoc[]) {
-        this.commentParts.push({pos, end, text: text.replace(/\r\n/g, "\n"), jsDoc});
+        const originalLength = text.length;
+        if (end - pos !== originalLength) {
+            throw new Error("The length of the comment does not match the position and end values!");
+        }
+        text = text.replace(/\r\n$/, "\n").replace(/\n$/, "");
+        end = pos + text.length;
+        this.commentParts.push({pos, end, text, jsDoc});
     }
 
     public getCompleteComment(): ICommentPart {
-        const text = this.commentParts.map( (part) => part.text ).join("\n");
+        const text = this.commentParts.map( (part) => part.text ).join(Utils.newLineChar);
         return { end: this.commentParts[this.commentParts.length - 1].end,
             pos: this.commentParts[0].pos,
             text,
@@ -58,22 +64,28 @@ export class SourceComment implements TextRange {
     }
 
     public getSanitizedCommentLines(): ICommentPart[] {
+        const unsanitizedLines = this.getUnsanitizedCommentLines();
+        let currentPartStartLine = 0;
         const sanitizedComments = this.commentParts.map( (part) => {
             const cleansedText = this.stripCommentStartTokens(part.text);
             let pos = part.pos;
-            const unsanitizedLines = part.text.split("\n");
-            return cleansedText.split("\n").map( (line, index): ICommentPart => {
-                const lineLength = unsanitizedLines[index].length;
+            const cleansedLines = cleansedText.split("\n");
+            const sanitizedLines = cleansedLines.map( (line, index): ICommentPart => {
+                const unsanitizedLineText = unsanitizedLines[currentPartStartLine + index].text;
+                const positionInLine = unsanitizedLineText.indexOf(line);
+                const lineLength = unsanitizedLineText.length;
                 line = Utils.trimTrailingSpace(line);
-                const result: ICommentPart = { pos,
+                const result: ICommentPart = { pos: pos + positionInLine,
                     end: pos + lineLength,
                     text: line,
                     jsDoc: part.jsDoc,
                 };
                 // + 1 to include the removed newline character
-                pos += unsanitizedLines[index].length + 1;
+                pos += lineLength + 1;
                 return result;
             });
+            currentPartStartLine += cleansedLines.length;
+            return sanitizedLines;
         });
         return Utils.flatten(sanitizedComments);
     }
@@ -104,6 +116,22 @@ export class SourceComment implements TextRange {
 
     public getStart(): number {
         return this.pos;
+    }
+
+    private getUnsanitizedCommentLines(): ICommentPart[] {
+        return Utils.flatten(this.commentParts.map((part) => {
+            let pos = part.pos;
+            return part.text.split("\n").map((lineText) => {
+                const result: ICommentPart = {
+                    pos,
+                    end: pos + lineText.length,
+                    text: lineText,
+                    jsDoc: part.jsDoc,
+                };
+                pos += lineText.length;
+                return result;
+            });
+        }));
     }
 
     private stripCommentStartTokens(text: string): string {

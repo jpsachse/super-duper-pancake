@@ -102,8 +102,12 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
         jsDocs.forEach((jsDoc: ts.JSDoc) => {
             while (currentIndex < unacceptableLines.length) {
                 const codeLine = commentLines[unacceptableLines[currentIndex]];
-                const commentPos = codeLine.pos - jsDoc.pos;
-                if (this.isEscapedCode(codeLine.text, jsDoc.comment, commentPos)) {
+                const codePos = codeLine.pos - jsDoc.pos;
+                // We can't use jsDoc.end, as that includes all children and we want to know,
+                // where the overview text ends.
+                const commentEnd = jsDoc.getChildCount(this.sourceFile) > 0 ?
+                        jsDoc.getChildAt(0, this.sourceFile).pos - 1 : jsDoc.end;
+                if (this.isEscapedCode(codeLine.text, jsDoc.getFullText(), commentEnd - jsDoc.pos, codePos)) {
                     unacceptableLines.splice(currentIndex, 1);
                 } else {
                     currentIndex++;
@@ -125,10 +129,11 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
                         currentIndex++;
                         continue;
                     }
-                    const commentPos = commentLines[codeLineNumber].pos - child.pos;
+                    const codePos = commentLines[codeLineNumber].pos - child.pos;
+                    const codeLineText = commentLines[codeLineNumber].text;
                     if (child.tagName.text === "example" && child.comment.includes(codeText)) {
                         unacceptableLines.splice(currentIndex, 1);
-                    } else if (this.isEscapedCode(commentLines[codeLineNumber].text, child.comment, commentPos)) {
+                    } else if (this.isEscapedCode(codeLineText, child.getFullText(), child.end - child.pos, codePos)) {
                         unacceptableLines.splice(currentIndex, 1);
                     } else {
                         currentIndex++;
@@ -138,11 +143,12 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
         });
         if (jsDocs.length === 0) {
             currentIndex = 0;
-            const commentText = comment.getSanitizedCommentText().text;
+            const commentText = comment.getCompleteComment().text;
             while (currentIndex < unacceptableLines.length) {
                 const codeLineNumber = unacceptableLines[currentIndex];
-                const commentPos = commentLines[codeLineNumber].pos - comment.pos;
-                if (this.isEscapedCode(commentLines[codeLineNumber].text, commentText, commentPos)) {
+                const codePos = commentLines[codeLineNumber].pos - comment.pos;
+                const commentWidth = comment.end - comment.pos;
+                if (this.isEscapedCode(commentLines[codeLineNumber].text, commentText, commentWidth, codePos)) {
                     unacceptableLines.splice(currentIndex, 1);
                 } else {
                     currentIndex++;
@@ -152,13 +158,26 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
         return unacceptableLines;
     }
 
-    private isEscapedCode(codeText: string, commentText: string, codePosition: number): boolean {
-        if (codePosition < 0 || codePosition > commentText.length) { return false; }
+    /**
+     * Checks, whether a given part of text that has been classified as comment is escaped using three accents graves.
+     * @param codeText The text that has been classified as code.
+     * @param commentText The complete comment text.
+     * @param commentEnd The width of the comment, which might be different from commentText.length,
+     * as windows newlines get stripped in SourceComments.
+     * @param codePosition The position in the comment, where the codeText begins,
+     * relative to the comment start being 0.
+     */
+    private isEscapedCode(codeText: string, commentText: string, commentEnd: number, codePosition: number): boolean {
+        if (codePosition < 0 || codePosition > commentEnd) { return false; }
         const acceptableRegex = /[``]{3,}[^``]*[``]{3,}/g;
         let match = acceptableRegex.exec(commentText);
+        // Iterate over all escaped comment parts to see, whether the code actually lies in one.
         while (match) {
-            if (match.index > codePosition) { return false; }
-            if (match.toString().includes(codeText)) { return true; }
+            const matchText = match.toString();
+            if (match.index > codePosition || match.index + matchText.length < codePosition + codeText.length) {
+                return false;
+            }
+            if (matchText.includes(codeText)) { return true; }
             match = acceptableRegex.exec(commentText);
         }
         return false;
@@ -311,7 +330,8 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
                 }
                 // if (noContentRegexp.test(currentLineText) || commentsInLine.length > 0) {
                 // TODO: this is just here for live-feedback purposes
-                const failureStart = this.sourceMap.sourceFile.getPositionOfLineAndCharacter(currentSectionStartLine, 0);
+                const failureStart =
+                        this.sourceMap.sourceFile.getPositionOfLineAndCharacter(currentSectionStartLine, 0);
                 this.addFailureAt(failureStart, 1, "sectionComplexity: " + sectionComplexity);
                 // start a new section
                 if (sectionComplexity > 0) {
