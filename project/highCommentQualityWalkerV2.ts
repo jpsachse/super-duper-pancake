@@ -5,7 +5,7 @@ import { PriorityQueue } from "typescript-collections";
 import { CodeDetector } from "./codeDetector";
 import { ICommentClassification } from "./commentClassificationTypes";
 import { CommentClassifier } from "./commentClassifier";
-import { CommentQuality, CommentQualityEvaluator } from "./commentQualityEvaluator";
+import { CommentQuality, CommentQualityEvaluator, IEvaluationResult } from "./commentQualityEvaluator";
 // tslint:disable-next-line:max-line-length
 import { CyclomaticComplexityCollector, HalsteadCollector, LinesOfCodeCollector, NestingLevelCollector } from "./metricCollectors";
 import { CommentClass, SourceComment } from "./sourceComment";
@@ -13,7 +13,7 @@ import { SourceMap } from "./sourceMap";
 import Utils from "./utils";
 
 interface ICommentStatistics {
-    quality: CommentQuality;
+    qualityEvaluation: IEvaluationResult;
     classifications: ICommentClassification[];
 }
 
@@ -39,8 +39,7 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
     private commentStats = new Map<SourceComment, ICommentStatistics>();
     private requiredCommentLines = new Map<number, string[]>();
     private nodeComplexities = new Map<ts.Node, number>();
-    // section start and end are line numbers, not positions in the text
-    private sections = new Map<ts.FunctionLikeDeclaration, ts.TextRange[]>();
+    private sectionStarts: number[] = [];
 
     constructor(sourceFile: ts.SourceFile, ruleName: string, options: T,
                 private locCollector: LinesOfCodeCollector,
@@ -56,6 +55,7 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
         if (sourceFile !== this.sourceFile) {
             throw new Error("Source file not equal to the one used for construction!");
         }
+        this.findSectionStarts();
         this.classifyComments();
 
         this.sourceMap.getAllFunctionLikes().forEach((node) => {
@@ -68,18 +68,35 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
     }
 
     private classifyComments() {
+        let currentSectionIndex = 0;
         this.sourceMap.getAllComments().forEach((comment) => {
+            const commentEndLine = this.sourceFile.getLineAndCharacterOfPosition(comment.end).line;
+            while (currentSectionIndex + 1 < this.sectionStarts.length &&
+                    commentEndLine + 1 >= this.sectionStarts[currentSectionIndex + 1]) {
+                currentSectionIndex++;
+            }
+            // TODO: improve finding the correct section end, as nested sections currently result in
+            // a too low number
+            const sectionEndLine = this.sectionStarts[currentSectionIndex + 1] - 1;
             const classifications = this.commentClassifier.classify(comment);
-            const quality = this.commentQualityEvaluator.evaluateQuality(comment, classifications, this.sourceMap);
-            this.commentStats.set(comment, {classifications, quality});
+            const evaluationResult = this.commentQualityEvaluator.evaluateQuality(comment,
+                                                                                  classifications,
+                                                                                  this.sourceMap,
+                                                                                  sectionEndLine);
+            this.commentStats.set(comment, {classifications, qualityEvaluation: evaluationResult});
             classifications.forEach( (classification, index) => {
                 if (classification.commentClass === CommentClass.Code) {
                     this.addFailureForClassification(comment, classification);
                 }
             });
-            if (quality <= CommentQuality.Low) {
+            if (evaluationResult.quality <= CommentQuality.Low && evaluationResult.quality !== CommentQuality.Unknown) {
                 const end = this.sourceFile.getLineEndOfPosition(comment.pos);
-                this.addFailure(comment.pos, end, "Low comment quality: " + CommentQuality[quality]);
+                const reasoning = evaluationResult.reasons.join("\n");
+                let failureMessage = "Low comment quality: " + CommentQuality[evaluationResult.quality];
+                if (reasoning.length > 0) {
+                    failureMessage += "\n" + reasoning;
+                }
+                this.addFailure(comment.pos, end, failureMessage);
             }
         });
         // TODO: smooth license comment classifications (add classification to comments between 2 license comments)
@@ -298,12 +315,41 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
         }
     }
 
+    private findSectionStarts() {
+        const sourceText = this.sourceFile.getFullText();
+        const sourceLines = sourceText.split("\n");
+        let previousLineWasCommentOnly = false;
+        let nextNodeStartsSection = true;
+        for (let currentLine = 0; currentLine < sourceLines.length; currentLine++) {
+            const commentsInLine = this.sourceMap.getCommentsInLine(currentLine);
+            const enclosingNode = this.sourceMap.getMostEnclosingNodeForLine(currentLine);
+            // const noContentRegexp = /^\s*$/;
+            if (!enclosingNode) {
+                // Only comments in the current line
+                if (commentsInLine.length > 0 && !previousLineWasCommentOnly) {
+                    previousLineWasCommentOnly = true;
+                    continue;
+                }
+                // if (noContentRegexp.test(currentLineText) || commentsInLine.length > 0) {
+                nextNodeStartsSection = true;
+                // }
+            } else {
+                previousLineWasCommentOnly = false;
+                if (nextNodeStartsSection) {
+                    this.sectionStarts.push(currentLine);
+                }
+                nextNodeStartsSection = false;
+            }
+        }
+        this.sectionStarts.push(sourceLines.length);
+    }
+
     private addCommentRequirements(node: ts.FunctionLikeDeclaration) {
         const startLine = this.sourceMap.sourceFile.getLineAndCharacterOfPosition(node.getStart()).line;
         const endLine = this.sourceMap.sourceFile.getLineAndCharacterOfPosition(node.getEnd()).line;
         let sectionComplexity = 0.0;
         let totalComplexity = 0.0;
-        let currentSectionStartLine = -1;
+        let currentSectionIndex = 0;
         const sortDescending = (a: ILineComplexity, b: ILineComplexity): number => {
             return a.complexity - b.complexity;
         };
@@ -313,39 +359,31 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
         let previousLineWasCommentOnly = false;
 
         for (let currentLine = startLine + 1; currentLine < endLine; ++currentLine) {
-            const commentsInLine = this.sourceMap.getCommentsInLine(currentLine);
+            // const commentsInLine = this.sourceMap.getCommentsInLine(currentLine);
             const enclosingNode = this.sourceMap.getMostEnclosingNodeForLine(currentLine);
             const currentLineText = nodeLines[currentLine - startLine];
-            const noContentRegexp = /^\s*$/;
-            if (currentSectionStartLine === -1) {
-                currentSectionStartLine = currentLine;
-            }
 
             // No code in the current line, except for opening / closing braces
             if (!enclosingNode) {
-                // Only comments in the current line
-                if (commentsInLine.length > 0 && !previousLineWasCommentOnly) {
-                    previousLineWasCommentOnly = true;
-                    continue;
-                }
-                // if (noContentRegexp.test(currentLineText) || commentsInLine.length > 0) {
                 // TODO: this is just here for live-feedback purposes
-                const failureStart =
-                        this.sourceMap.sourceFile.getPositionOfLineAndCharacter(currentSectionStartLine, 0);
+                const failureStart = this.sourceMap.sourceFile.getPositionOfLineAndCharacter(
+                        this.sectionStarts[currentSectionIndex], 0);
                 this.addFailureAt(failureStart, 1, "sectionComplexity: " + sectionComplexity);
                 // start a new section
                 if (sectionComplexity > 0) {
                     this.enforceCommentRequirementForSection(sectionComplexity,
                                                              HighCommentQualityWalkerV2.sectionComplexityThreshold,
-                                                             currentSectionStartLine,
+                                                             this.sectionStarts[currentSectionIndex],
                                                              lineComplexities,
                                                              HighCommentQualityWalkerV2.lineComplexityThreshold);
-                    sectionComplexities.add({line: currentSectionStartLine, complexity: sectionComplexity});
+                    sectionComplexities.add({line: this.sectionStarts[currentSectionIndex],
+                                             complexity: sectionComplexity});
                     sectionComplexity = 0;
                 }
-                currentSectionStartLine = -1;
                 lineComplexities.clear();
-                // }
+                if (currentLine >= this.sectionStarts[currentSectionIndex]) {
+                    currentSectionIndex++;
+                }
                 continue;
             }
             previousLineWasCommentOnly = false;
@@ -363,7 +401,7 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
         if (sectionComplexity > 0) {
             this.enforceCommentRequirementForSection(sectionComplexity,
                                                      HighCommentQualityWalkerV2.sectionComplexityThreshold,
-                                                     currentSectionStartLine,
+                                                     this.sectionStarts[currentSectionIndex],
                                                      lineComplexities,
                                                      HighCommentQualityWalkerV2.lineComplexityThreshold);
         }
@@ -424,7 +462,7 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
     }
 
     /**
-     * Add a failure to the given line if it doesn't have a meaningful comment yet.
+     * Requires a comment at the given line if it doesn't have a meaningful comment yet.
      * @param line The line that should be commented
      * @param sourceMap The SourceMap in which the line is located
      * @param failureMessage An optional message to be used upon failure
@@ -446,8 +484,8 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
                 return classification.commentClass === CommentClass.Annotation && !classification.lines;
             };
             if (stats.classifications.some(isAnnotation)) { return false; }
-            return stats.quality > CommentQuality.Low &&
-                commentDistance.distance <= stats.quality - CommentQuality.Low + 1;
+            return stats.qualityEvaluation.quality > CommentQuality.Low &&
+                commentDistance.distance <= stats.qualityEvaluation.quality - CommentQuality.Low + 1;
         });
 
         // Try to find comments that are close in terms of nesting-level
@@ -467,7 +505,7 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
                         return classification.commentClass === CommentClass.Annotation && !classification.lines;
                     };
                     if (stats.classifications.some(isAnnotation)) { return false; }
-                    return stats.quality > CommentQuality.Low;
+                    return stats.qualityEvaluation.quality > CommentQuality.Low;
                 });
             }
         }
