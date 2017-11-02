@@ -219,6 +219,11 @@ export class CommentQualityEvaluator {
         }
         const nameParts = this.normaliseWords(
                 this.filterCommonWords(Utils.splitIntoNormalizedWords(nodeName))).sort();
+        if (nameParts.length === 0) {
+            quality.quality = CommentQuality.Unknown;
+            quality.reasons.push("Could not create english wording for commented code");
+            return;
+        }
         const intersection = Utils.getIntersection(nameParts, usefulCommentParts);
         if (intersection.length === 0 || intersection.length / usefulCommentParts.length > threshold) {
             if (intersection.length === 0) {
