@@ -92,3 +92,25 @@ describe("filterLinesInUnacceptableContext", () => {
         expect(unacceptableLines).to.include(6);
     });
 });
+
+describe("findSectionStarts", () => {
+
+    it("should include the line after the file end as last section start", () => {
+        const walker = createWalker("test/highCommentQualityWalkerTest/findSectionStarts.ts");
+        const sectionStarts = walker["sectionStarts"];
+        expect(sectionStarts[sectionStarts.length - 1]).to.equal(11);
+    });
+
+    it("should create a section start after an empty line", () => {
+        const walker = createWalker("test/highCommentQualityWalkerTest/findSectionStarts.ts");
+        const sectionStarts = walker["sectionStarts"];
+        expect(sectionStarts).to.include(5);
+    });
+
+    it("should create a section start after a comment that is at least two lines long", () => {
+        const walker = createWalker("test/highCommentQualityWalkerTest/findSectionStarts.ts");
+        const sectionStarts = walker["sectionStarts"];
+        expect(sectionStarts).to.include(8);
+    });
+
+});
