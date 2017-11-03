@@ -15,15 +15,21 @@ export class NestingLevelCollector implements IMetricCollector {
 
         let nestingLevel = 0;
         let parent = node;
+        let currentNode = node;
         let lineOfParent = ts.getLineAndCharacterOfPosition(sourceFile, parent.getStart()).line;
         while (parent.parent !== undefined && !this.nestingLevels.has(node)) {
             parent = parent.parent;
             lineOfParent = ts.getLineAndCharacterOfPosition(sourceFile, parent.getStart()).line;
-            if (TSUtils.isFunctionScopeBoundary(parent) || TSUtils.isBlockScopeBoundary(parent)) {
+            if (TSUtils.isFunctionScopeBoundary(parent) ||
+                    TSUtils.isBlockScopeBoundary(parent) ||
+                    this.isConditionalScoped(currentNode)) {
                 nestingLevel++;
             }
+            currentNode = parent;
         }
-        if (TSUtils.isFunctionScopeBoundary(parent) || TSUtils.isBlockScopeBoundary(parent)) {
+        if (TSUtils.isFunctionScopeBoundary(parent) ||
+                TSUtils.isBlockScopeBoundary(parent) ||
+                this.isConditionalScoped(currentNode)) {
             nestingLevel++;
         }
         if (this.nestingLevels.has(node)) {
@@ -38,6 +44,18 @@ export class NestingLevelCollector implements IMetricCollector {
         this.visitNode(node);
         nestingLevel = this.nestingLevels.get(node);
         return nestingLevel;
+    }
+
+    private isConditionalScoped(node: ts.Node): boolean {
+        const parent = node.parent;
+        if (!parent) { return false; }
+        if (ts.isIfStatement(parent) && (node === parent.thenStatement || node === parent.elseStatement)) {
+            return true;
+        }
+        if (ts.isIterationStatement(parent, false) && (node === parent.statement)) {
+            return true;
+        }
+        return false;
     }
 
 }

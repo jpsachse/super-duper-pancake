@@ -1,4 +1,4 @@
-
+// tslint:disable
 class Bar {
 
     private foo() {
@@ -17,3 +17,15 @@ enum Test {
 }
 
 const anotherVariable = { anAttribute: "aValue" };
+
+function test(foo: number): boolean {
+    if (foo < 100)
+        return false;
+    else if (foo > 1)
+        return foo < 5;
+    else
+        foo += 5;
+    do
+        foo++;
+    while (foo < 100)
+}

@@ -51,4 +51,40 @@ describe("visitNode", () => {
         expect(collector.getNestingLevel(node)).to.equal(0);
     });
 
+    it("should increase the nesting level in functions", () => {
+        const node = sourceMap.getMostEnclosingNodeForLine(21);
+        collector.visitNode(node);
+        expect(collector.getNestingLevel(node)).to.equal(1);
+    });
+
+    it("should increase the nesting level for if statements without a block", () => {
+        const node = sourceMap.getMostEnclosingNodeForLine(22);
+        collector.visitNode(node);
+        expect(collector.getNestingLevel(node)).to.equal(2);
+    });
+
+    it("should not increase the nesting level for lines with the else keyword", () => {
+        const node = sourceMap.getMostEnclosingNodeForLine(23);
+        collector.visitNode(node);
+        expect(collector.getNestingLevel(node)).to.equal(1);
+    });
+
+    it("should increase the nesting level for else if branches over the one of the initial then branch", () => {
+        const node = sourceMap.getMostEnclosingNodeForLine(24);
+        collector.visitNode(node);
+        expect(collector.getNestingLevel(node)).to.equal(3);
+    });
+
+    it("should not increase the nesting level for else branches over the one of the then branch", () => {
+        const node = sourceMap.getMostEnclosingNodeForLine(26);
+        collector.visitNode(node);
+        expect(collector.getNestingLevel(node)).to.equal(3);
+    });
+
+    it("should increase the nesting level for do statements without a block", () => {
+        const node = sourceMap.getMostEnclosingNodeForLine(28);
+        collector.visitNode(node);
+        expect(collector.getNestingLevel(node)).to.equal(2);
+    });
+
 });
