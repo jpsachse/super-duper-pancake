@@ -149,9 +149,6 @@ export class SourceMap {
         const lineStart = this.sourceFile.getPositionOfLineAndCharacter(line, 0);
         const lineEnd = this.sourceFile.getLineEndOfPosition(lineStart);
         const lineText = this.sourceFile.getFullText().substring(lineStart, lineEnd);
-        if (lineStart === lineEnd || lineText.replace(/\s*/, "").length === 0) {
-            return;
-        }
         const nodes = this.nodesOfLine.get(line);
         if (!nodes || nodes.length === 0) { return; }
         let index = 0;
@@ -162,6 +159,11 @@ export class SourceMap {
         let node: SourcePart;
         if (index < nodes.length) {
             node = nodes[index];
+        } else {
+            node = nodes[nodes.length - 1];
+            if (!Utils.isNode(node) || node.kind !== ts.SyntaxKind.SyntaxList) {
+                node = undefined;
+            }
         }
         if (!Utils.isNode(node)) {
             return;

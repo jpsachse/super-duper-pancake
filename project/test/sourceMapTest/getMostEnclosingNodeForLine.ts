@@ -22,3 +22,11 @@ class InlineEnding {
 
 function test(): number {
     return 5; }
+
+
+if (true) { const bar = 5;
+}
+
+anObject.aFunction(withA,
+
+                   parameterList);

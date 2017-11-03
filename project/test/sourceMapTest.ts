@@ -208,6 +208,20 @@ describe("getMostEnclosingNodeForLine", () => {
         expect(node.kind).to.equal(ts.SyntaxKind.ReturnStatement);
     });
 
+    it("should return the enclosing if, even if another statement is on the same line", () => {
+        const map = createSourceMap("test/sourceMapTest/getMostEnclosingNodeForLine.ts");
+        const node = map.getMostEnclosingNodeForLine(26);
+        expect(node).to.not.equal(undefined);
+        expect(node.kind).to.equal(ts.SyntaxKind.IfStatement);
+    });
+
+    it("should not return undefined for an empty line if it's inside of a syntax list", () => {
+        const map = createSourceMap("test/sourceMapTest/getMostEnclosingNodeForLine.ts");
+        const node = map.getMostEnclosingNodeForLine(30);
+        expect(node).to.not.equal(undefined);
+        expect(node.kind).to.equal(ts.SyntaxKind.ExpressionStatement);
+    });
+
 });
 
 describe("isBlockStartingInLine", () => {
