@@ -30,3 +30,11 @@ if (true) { const bar = 5;
 anObject.aFunction(withA,
 
                    parameterList);
+
+
+function test2(withParameter: number): number {
+    console.log("This should result in the value undefined");
+
+    let aVariable = 5;
+    return aVariable;
+}

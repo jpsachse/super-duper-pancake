@@ -161,7 +161,8 @@ export class SourceMap {
             node = nodes[index];
         } else {
             node = nodes[nodes.length - 1];
-            if (!Utils.isNode(node) || node.kind !== ts.SyntaxKind.SyntaxList) {
+            if (!Utils.isNode(node) ||
+                    !(node.kind === ts.SyntaxKind.SyntaxList && node.parent.kind !== ts.SyntaxKind.Block)) {
                 node = undefined;
             }
         }

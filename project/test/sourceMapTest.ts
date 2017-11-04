@@ -222,6 +222,12 @@ describe("getMostEnclosingNodeForLine", () => {
         expect(node.kind).to.equal(ts.SyntaxKind.ExpressionStatement);
     });
 
+    it("should return undefined for an empty line in a function", () => {
+        const map = createSourceMap("test/sourceMapTest/getMostEnclosingNodeForLine.ts");
+        const node = map.getMostEnclosingNodeForLine(36);
+        expect(node).to.equal(undefined);
+    });
+
 });
 
 describe("isBlockStartingInLine", () => {
