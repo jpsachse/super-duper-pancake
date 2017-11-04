@@ -1,3 +1,4 @@
+import { Interval, IntervalTree } from "node-interval-tree";
 import * as Lint from "tslint";
 import * as TSUtils from "tsutils";
 import * as ts from "typescript";
@@ -39,14 +40,15 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
     private commentStats = new Map<SourceComment, ICommentStatistics>();
     private requiredCommentLines = new Map<number, string[]>();
     private nodeComplexities = new Map<ts.Node, number>();
-    private sectionStarts: number[] = [];
+    private sections = new IntervalTree<Interval>();
+    private nestingLevelCollector = new NestingLevelCollector();
 
     constructor(sourceFile: ts.SourceFile, ruleName: string, options: T,
                 private locCollector: LinesOfCodeCollector,
                 private ccCollector: CyclomaticComplexityCollector,
                 private codeDetector: CodeDetector) {
         super(sourceFile, ruleName, options);
-        this.sourceMap = new SourceMap(sourceFile, [locCollector, ccCollector]);
+        this.sourceMap = new SourceMap(sourceFile, [locCollector, ccCollector, this.nestingLevelCollector]);
         this.commentQualityEvaluator = new CommentQualityEvaluator();
         this.commentClassifier = new CommentClassifier(codeDetector, this.sourceMap);
     }
@@ -55,7 +57,7 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
         if (sourceFile !== this.sourceFile) {
             throw new Error("Source file not equal to the one used for construction!");
         }
-        this.findSectionStarts();
+        this.findSections();
         this.classifyComments();
 
         this.sourceMap.getAllFunctionLikes().forEach((node) => {
@@ -68,16 +70,11 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
     }
 
     private classifyComments() {
-        let currentSectionIndex = 0;
         this.sourceMap.getAllComments().forEach((comment) => {
             const commentEndLine = this.sourceFile.getLineAndCharacterOfPosition(comment.end).line;
-            while (currentSectionIndex + 1 < this.sectionStarts.length &&
-                    commentEndLine + 1 >= this.sectionStarts[currentSectionIndex + 1]) {
-                currentSectionIndex++;
-            }
-            // TODO: improve finding the correct section end, as nested sections currently result in
-            // a too low number
-            const sectionEndLine = this.sectionStarts[currentSectionIndex + 1] - 1;
+            let possibleSections = this.sections.search(commentEndLine + 1, commentEndLine + 1);
+            possibleSections = possibleSections.sort((a, b) => a.low - b.low);
+            const sectionEndLine = possibleSections.length > 0 ? possibleSections[0].high : commentEndLine;
             const classifications = this.commentClassifier.classify(comment);
             const evaluationResult = this.commentQualityEvaluator.evaluateQuality(comment,
                                                                                   classifications,
@@ -315,33 +312,56 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
         }
     }
 
-    private findSectionStarts() {
-        const sourceText = this.sourceFile.getFullText();
-        const sourceLines = sourceText.split("\n");
-        let previousLineWasCommentOnly = false;
-        let nextNodeStartsSection = true;
-        for (let currentLine = 0; currentLine < sourceLines.length; currentLine++) {
-            const commentsInLine = this.sourceMap.getCommentsInLine(currentLine);
-            const enclosingNode = this.sourceMap.getMostEnclosingNodeForLine(currentLine);
-            // const noContentRegexp = /^\s*$/;
-            if (!enclosingNode) {
-                // Only comments in the current line
-                if (commentsInLine.length > 0 && !previousLineWasCommentOnly) {
-                    previousLineWasCommentOnly = true;
-                    continue;
+    private findSections() {
+        const functions = this.sourceMap.getAllFunctionLikes();
+        functions.forEach( (functionLike) => {
+            const functionStartLine = this.sourceFile.getLineAndCharacterOfPosition(functionLike.getStart()).line;
+            const functionEndLine =  this.sourceFile.getLineAndCharacterOfPosition(functionLike.end).line;
+            const findSectionInSection = (startLine: number, nestingLevel: number): number => {
+                let previousLineWasCommentOnly = false;
+                let currentSectionStartLine = startLine;
+                let currentSectionEndLine = startLine;
+                for (let currentLine = startLine; currentLine <= functionEndLine; currentLine++) {
+                    const commentsInLine = this.sourceMap.getCommentsInLine(currentLine);
+                    const enclosingNode = this.sourceMap.getMostEnclosingNodeForLine(currentLine);
+                    const firstNodeInLine = this.sourceMap.getFirstNodeInLine(currentLine);
+                    const usableNode = enclosingNode || firstNodeInLine;
+                    if (!usableNode) {
+                        // Only comments in the current line
+                        if (commentsInLine.length > 0 && !previousLineWasCommentOnly) {
+                            previousLineWasCommentOnly = true;
+                            continue;
+                        } // TODO: don't do this if currentsectionstartline is -1 (multiple empty lines)
+                        if (currentSectionStartLine > -1) {
+                            this.sections.insert({low: currentSectionStartLine, high: currentSectionEndLine});
+                        }
+                        currentSectionStartLine = -1;
+                        continue;
+                    }
+                    if (currentSectionStartLine === -1) {
+                        // TODO: get the correct starting line, as this might be one (or several) lines too far
+                        currentSectionStartLine = currentLine;
+                    }
+                    const currentNestingLevel = this.nestingLevelCollector.getNestingLevel(usableNode);
+                    previousLineWasCommentOnly = false;
+                    if (currentNestingLevel > nestingLevel) {
+                        currentLine = findSectionInSection(currentLine, currentNestingLevel);
+                        currentSectionEndLine = currentLine;
+                        continue;
+                    } else if (currentNestingLevel < nestingLevel) {
+                        this.sections.insert({low: currentSectionStartLine, high: currentSectionEndLine});
+                        return currentSectionEndLine;
+                    }
+                    currentSectionEndLine = currentLine;
                 }
-                // if (noContentRegexp.test(currentLineText) || commentsInLine.length > 0) {
-                nextNodeStartsSection = true;
-                // }
-            } else {
-                previousLineWasCommentOnly = false;
-                if (nextNodeStartsSection) {
-                    this.sectionStarts.push(currentLine);
+                if (currentSectionStartLine > -1) {
+                    this.sections.insert({low: currentSectionStartLine, high: functionEndLine});
                 }
-                nextNodeStartsSection = false;
-            }
-        }
-        this.sectionStarts.push(sourceLines.length);
+                return functionEndLine;
+            };
+            const startingNestingLevel = this.nestingLevelCollector.getNestingLevel(functionLike);
+            findSectionInSection(functionStartLine, startingNestingLevel);
+        });
     }
 
     private addCommentRequirements(node: ts.FunctionLikeDeclaration) {
@@ -349,7 +369,6 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
         const endLine = this.sourceMap.sourceFile.getLineAndCharacterOfPosition(node.getEnd()).line;
         let sectionComplexity = 0.0;
         let totalComplexity = 0.0;
-        let currentSectionIndex = 0;
         const sortDescending = (a: ILineComplexity, b: ILineComplexity): number => {
             return a.complexity - b.complexity;
         };
@@ -357,33 +376,32 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
         const sectionComplexities = new PriorityQueue<ILineComplexity>(sortDescending);
         const nodeLines = node.getText().split("\n");
         let previousLineWasCommentOnly = false;
+        let possibleSections: Interval[];
 
         for (let currentLine = startLine + 1; currentLine < endLine; ++currentLine) {
             // const commentsInLine = this.sourceMap.getCommentsInLine(currentLine);
             const enclosingNode = this.sourceMap.getMostEnclosingNodeForLine(currentLine);
             const currentLineText = nodeLines[currentLine - startLine];
-
+            possibleSections = this.sections.search(currentLine, currentLine);
+            possibleSections = possibleSections.sort((a, b): number => b.low - a.low);
             // No code in the current line, except for opening / closing braces
             if (!enclosingNode) {
                 // TODO: this is just here for live-feedback purposes
                 const failureStart = this.sourceMap.sourceFile.getPositionOfLineAndCharacter(
-                        this.sectionStarts[currentSectionIndex], 0);
+                        possibleSections[0].low, 0);
                 this.addFailureAt(failureStart, 1, "sectionComplexity: " + sectionComplexity);
-                // start a new section
+                // Save previous section complexity, as a new section starts
                 if (sectionComplexity > 0) {
                     this.enforceCommentRequirementForSection(sectionComplexity,
                                                              HighCommentQualityWalkerV2.sectionComplexityThreshold,
-                                                             this.sectionStarts[currentSectionIndex],
+                                                             possibleSections[0].low,
                                                              lineComplexities,
                                                              HighCommentQualityWalkerV2.lineComplexityThreshold);
-                    sectionComplexities.add({line: this.sectionStarts[currentSectionIndex],
+                    sectionComplexities.add({line: possibleSections[0].low,
                                              complexity: sectionComplexity});
                     sectionComplexity = 0;
                 }
                 lineComplexities.clear();
-                if (currentLine >= this.sectionStarts[currentSectionIndex]) {
-                    currentSectionIndex++;
-                }
                 continue;
             }
             previousLineWasCommentOnly = false;
@@ -397,11 +415,13 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
 
             lineComplexities.add({line: currentLine, complexity: lineComplexity});
         }
+        possibleSections = this.sections.search(endLine, endLine);
+        possibleSections = possibleSections.sort((a, b): number => b.low - a.low);
         // enforce section complexity for last section
         if (sectionComplexity > 0) {
             this.enforceCommentRequirementForSection(sectionComplexity,
                                                      HighCommentQualityWalkerV2.sectionComplexityThreshold,
-                                                     this.sectionStarts[currentSectionIndex],
+                                                     possibleSections[0].low,
                                                      lineComplexities,
                                                      HighCommentQualityWalkerV2.lineComplexityThreshold);
         }

@@ -93,24 +93,42 @@ describe("filterLinesInUnacceptableContext", () => {
     });
 });
 
-describe("findSectionStarts", () => {
+describe("findSections", () => {
 
-    it("should include the line after the file end as last section start", () => {
-        const walker = createWalker("test/highCommentQualityWalkerTest/findSectionStarts.ts");
-        const sectionStarts = walker["sectionStarts"];
-        expect(sectionStarts[sectionStarts.length - 1]).to.equal(11);
+    it("should start and end a section in function start and end lines", () => {
+        const walker = createWalker("test/highCommentQualityWalkerTest/findSections.ts");
+        const sections = walker["sections"];
+        expect(sections.search(1, 9)).to.deep.include({low: 1, high: 13});
     });
 
-    it("should create a section start after an empty line", () => {
-        const walker = createWalker("test/highCommentQualityWalkerTest/findSectionStarts.ts");
-        const sectionStarts = walker["sectionStarts"];
-        expect(sectionStarts).to.include(5);
+    it("should start and end a section at block start and end lines of ifs", () => {
+        const walker = createWalker("test/highCommentQualityWalkerTest/findSections.ts");
+        const sections = walker["sections"];
+        expect(sections.search(4, 6)).to.deep.include({low: 5, high: 6});
     });
 
-    it("should create a section start after a comment that is at least two lines long", () => {
-        const walker = createWalker("test/highCommentQualityWalkerTest/findSectionStarts.ts");
-        const sectionStarts = walker["sectionStarts"];
-        expect(sectionStarts).to.include(8);
+    it("should end a section on empty lines", () => {
+        const walker = createWalker("test/highCommentQualityWalkerTest/findSections.ts");
+        const sections = walker["sections"];
+        expect(sections.search(7, 7)).to.deep.include({low: 2, high: 7});
+    });
+
+    it("should start a new section in the first line containing a node after whitespace", () => {
+        const walker = createWalker("test/highCommentQualityWalkerTest/findSections.ts");
+        const sections = walker["sections"];
+        expect(sections.search(9, 9)).to.deep.include({low: 9, high: 9});
+    });
+
+    it("should end a section with long comments", () => {
+        const walker = createWalker("test/highCommentQualityWalkerTest/findSections.ts");
+        const sections = walker["sections"];
+        expect(sections.search(9, 9)).to.deep.include({low: 9, high: 9});
+    });
+
+    it("should start a new section in the first line containing a node after a long comment", () => {
+        const walker = createWalker("test/highCommentQualityWalkerTest/findSections.ts");
+        const sections = walker["sections"];
+        expect(sections.search(12, 12)).to.deep.include({low: 12, high: 13});
     });
 
 });
