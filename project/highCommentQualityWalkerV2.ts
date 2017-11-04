@@ -349,6 +349,12 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
                         currentSectionEndLine = currentLine;
                         continue;
                     } else if (currentNestingLevel < nestingLevel) {
+                        // This only happens if nesting level gets decreased after an empty line.
+                        // Then, this function has not yet correclty returned out of the recursion.
+                        if (currentSectionEndLine < currentSectionStartLine) {
+                            // Force-return out of the recursion with the line above (for loop increases by 1)
+                            return currentLine - 2;
+                        }
                         this.sections.insert({low: currentSectionStartLine, high: currentSectionEndLine});
                         return currentSectionEndLine;
                     }
