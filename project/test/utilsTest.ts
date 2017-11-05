@@ -31,22 +31,22 @@ describe("create range", () => {
 describe("splitIntoNormalizedWords", () => {
 
     it("should split camelCased words into lowercase chunks", () => {
-        const words = Utils.splitIntoNormalizedWords("theseAreSomeCamelCasedWords");
+        const words = Utils.splitWords("theseAreSomeCamelCasedWords");
         expect(words).to.deep.equal(["these", "are", "some", "camel", "cased", "words"]);
     });
 
     it("should split numbers into separate words", () => {
-        const words = Utils.splitIntoNormalizedWords("theseAreSome123numbers12Words");
+        const words = Utils.splitWords("theseAreSome123numbers12Words");
         expect(words).to.deep.equal(["these", "are", "some", "123", "numbers", "12", "words"]);
     });
 
     it("should split at existing spaces, underscores and dashes", () => {
-        const words = Utils.splitIntoNormalizedWords("this-isA_very Weird_-text");
+        const words = Utils.splitWords("this-isA_very Weird_-text");
         expect(words).to.deep.equal(["this", "is", "a", "very", "weird", "text"]);
     });
 
     it("should not split ALLCAPS written parts, but instead split at the edges", () => {
-        const words = Utils.splitIntoNormalizedWords("theseAreSomeALLCapsWords");
+        const words = Utils.splitWords("theseAreSomeALLCapsWords");
         expect(words).to.deep.equal(["these", "are", "some", "all", "caps", "words"]);
     });
 

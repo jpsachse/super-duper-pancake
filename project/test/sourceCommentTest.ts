@@ -36,7 +36,6 @@ describe("get complete comment", () => {
         const comment = buildComment(commentTextPart1, commentTextPart2, commentTextPart3);
         const totalLength = commentTextPart1.length + commentTextPart2.length + commentTextPart3.length;
         const joinedComment = comment.getCompleteComment();
-        console.log(joinedComment);
         expect(joinedComment.pos).to.equal(0);
         expect(joinedComment.end).to.equal(totalLength);
         expect(joinedComment.text).to.equal(commentTextPart1 + Utils.newLineChar +
