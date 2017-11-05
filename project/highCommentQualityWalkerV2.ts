@@ -30,9 +30,9 @@ interface IAnalysisResult {
 
 export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
 
-    public static sectionComplexityThreshold = 7;
-    public static nodeTotalComplexityThreshold = 5;
-    public static lineComplexityThreshold = 3;
+    public static sectionComplexityThreshold = 10;
+    public static nodeTotalComplexityThreshold = 20;
+    public static lineComplexityThreshold = 5;
 
     private sourceMap: SourceMap;
     private commentClassifier: CommentClassifier;
@@ -225,7 +225,7 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
         });
         if (ts.isCallLikeExpression(node) || ts.isBinaryExpression(node) ||
                 ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression (node)) {
-            complexity += 0.5 * Math.pow(2, maxChildExpressionNestingDepth);
+            complexity += 0.4 * Math.pow(2, maxChildExpressionNestingDepth);
             maxChildExpressionNestingDepth++;
         } else {
             maxChildExpressionNestingDepth = 0;
