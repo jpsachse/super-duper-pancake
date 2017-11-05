@@ -133,6 +133,12 @@ export class CommentQualityEvaluator {
         return result;
     }
 
+    /**
+     * Evaluate the quality of a comment associated with a declaration based on the declaration's identifier.
+     * @param comment  The comment whose quality should be evaluated.
+     * @param declaration The declaraction the comment is associated with
+     * @param sourceMap The SourceMap of the file the comment is located in.
+     */
     private assessDeclarationComment(comment: SourceComment,
                                      declaration: ts.Declaration,
                                      sourceMap: SourceMap): EvaluationResult {
@@ -171,7 +177,7 @@ export class CommentQualityEvaluator {
     }
 
     /**
-     * Assesses the quality and completeness of the JSDoc comment, similar to the valid-jsdoc eslint rule.
+     * Evaluates the quality and completeness of the JSDoc comment, similar to the valid-jsdoc eslint rule.
      * For a function, all parameters should be listed and have a comment with more than just being a type
      * or character name reference (e.g. "@param aString A string").
      * @param jsDoc The JSDoc object representing the comment
@@ -190,20 +196,22 @@ export class CommentQualityEvaluator {
             }
             return result;
         };
+        // Collect all parameters commented in the JSDoc comment
         const jsDocParameterComments = new Map<string, string>();
         jsDoc.forEachChild((docChild) => {
             if (ts.isJSDocParameterTag(docChild)) {
                 jsDocParameterComments.set(docChild.name.getText(), docChild.comment);
             }
         });
-        // Lower the comment quality if parameters are missing from the JSDoc
         let commentedParameterCount = 0;
         let lowQualityCommentParameterCount = 0;
         let parameterCount = 0;
+        // Iterate over all parameters in the declaration and assess their comment quality
         declaration.forEachChild((child) => {
             if (ts.isParameter(child)) {
                 parameterCount++;
                 const parameterComment = jsDocParameterComments.get(child.name.getText());
+                // Lower the comment quality if parameters are missing from the JSDoc
                 if (!parameterComment) {
                     evaluationResult.decreaseQuality();
                     const failureReason = "Missing explanation for parameter: " + this.getNameOfDeclaration(child);
@@ -212,14 +220,17 @@ export class CommentQualityEvaluator {
                 }
                 commentedParameterCount++;
                 const parameterQuality = assessParamCommentQuality(parameterComment, child);
+                // Count the total quality distance of all parameters from CommentQuality.Medium
                 if (parameterQuality.quality < CommentQuality.Medium) {
                     lowQualityCommentParameterCount += CommentQuality.Medium - parameterQuality.quality;
                     evaluationResult.reasons.push(...parameterQuality.reasons);
-                } else if (parameterQuality.quality > CommentQuality.Medium) {
+                } else {
                     lowQualityCommentParameterCount -= parameterQuality.quality - CommentQuality.Medium;
                 }
             }
         });
+        // Adjust evaluated quality based on total distance to .Medium and reduce quality if a parameter
+        // is not commented
         if (parameterCount > 0) {
             if (lowQualityCommentParameterCount >= commentedParameterCount) {
                 evaluationResult.decreaseQuality();
@@ -232,8 +243,21 @@ export class CommentQualityEvaluator {
         }
     }
 
+    /**
+     * Evaluate the overlap between both given strings. Both strings get normalized by splitting them
+     * into sets of lowercase words and applying inflection rules.
+     * @param evaluationResult The evaluation result object on which this evaluation is based.
+     * This object gets changed and will contain the result.
+     * @param comment The comment whose quality should be evaluated.
+     * @param nodeName The name of the node that should be compared with the comment
+     * @param commentCoverageThreshold The threshold of the percentage of words of the comment
+     * that can be also in the name. If the overlap is higher, the quality might be decreased.
+     * @param nameCoverageThreshold The threshold of the percentage words of the name that can
+     * also be in the comment. If the overlap is higher, the quality might be decreased.
+     */
     private evaluateContentOverlap(evaluationResult: EvaluationResult, comment: string, nodeName: string,
                                    commentCoverageThreshold: number, nameCoverageThreshold?: number) {
+        // Get words of comment and node and calculate intersection
         const usefulCommentParts = this.normaliseWords(this.filterCommonWords(Utils.splitWords(comment))).sort();
         if (usefulCommentParts.length === 0) {
             evaluationResult.decreaseQuality();
@@ -249,11 +273,13 @@ export class CommentQualityEvaluator {
         const nameCoverage = intersection.length / nameParts.length;
         const commentCoverage = intersection.length / usefulCommentParts.length;
 
+        // Comment and node might be unrelated, as no intersection is found
         if (intersection.length === 0) {
             evaluationResult.reasons.push("No relation between comment and code could be found");
             evaluationResult.decreaseQuality();
             return;
         }
+        // The comment might add no additional information and thus be unhelpful
         if ((commentCoverage > commentCoverageThreshold) &&
                 (nameCoverageThreshold === undefined || nameCoverage > nameCoverageThreshold)) {
             evaluationResult.reasons.push("Too much overlap between comment and code");
@@ -267,6 +293,10 @@ export class CommentQualityEvaluator {
         return stopword.removeStopwords(words);
     }
 
+    /**
+     * Normalize an array of words by applying inflection rules and returning infinitive versions.
+     * @param words The array of words to be normalized.
+     */
     private normaliseWords(words: string[]): string[] {
         const inflector = compendium.inflector;
         const result: string[] = [];
