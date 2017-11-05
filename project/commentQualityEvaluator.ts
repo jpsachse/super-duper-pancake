@@ -34,6 +34,13 @@ export class CommentQualityEvaluator {
     private static WORD_MATCH_THRESHOLD = 0.5;
     private static PARAMETER_WORD_MATCH_THRESHOLD = 0.8;
 
+    /**
+     * Evaluate the quality of a SourceComment based on its surroundings.
+     * @param comment The comment whose quality should be evaluated.
+     * @param classifications The classifications of the comment.
+     * @param sourceMap The SourceMap of the file the comment is located in.
+     * @param sectionEndLine The last line of the section the comment is associated with.
+     */
     public evaluateQuality(comment: SourceComment,
                            classifications: ICommentClassification[],
                            sourceMap: SourceMap,
@@ -61,29 +68,37 @@ export class CommentQualityEvaluator {
         if (Utils.isDeclaration(nextNode)) {
             return this.assessDeclarationComment(comment, nextNode, sourceMap);
         } else {
-            return this.assessInlineComment(comment, nextNode, sourceMap, sectionEndLine);
+            return this.assessInlineComment(comment, sourceMap, sectionEndLine);
         }
     }
 
-    private assessInlineComment(comment: SourceComment, nextNode: ts.Node,
-                                sourceMap: SourceMap, sectionEndLine: number): EvaluationResult {
-        if (!nextNode) {
-            // TODO: try to grasp a wider understanding of the section that follows a node
-            // instead of just comparing it to the next node and its children
-            return new EvaluationResult(CommentQuality.Unknown, []);
-        }
+    /**
+     * Evaluate the quality of an inline SourceComment based on the content of the section it is associated with.
+     * @param comment The comment whose quality should be evaluated.
+     * @param sourceMap The SourceMap of the file the comment is located in.
+     * @param sectionEndLine The last line of the section the comment is associated with.
+     */
+    private assessInlineComment(comment: SourceComment, sourceMap: SourceMap,
+                                sectionEndLine: number): EvaluationResult {
         const evaluationResult = new EvaluationResult(CommentQuality.Low, []);
-
-        const keywords = this.collectKeywords(comment, sourceMap, sectionEndLine);
+        const startLine = sourceMap.sourceFile.getLineAndCharacterOfPosition(comment.end).line + 1;
+        const keywords = this.collectKeywords(sourceMap, startLine, sectionEndLine);
         const codeContent = keywords.join("-");
         this.evaluateContentOverlap(evaluationResult, comment.getSanitizedCommentText().text, codeContent, 0.5, 0.5);
         return evaluationResult;
     }
 
-    private collectKeywords(comment: SourceComment, sourceMap: SourceMap, sectionEnd: number): string[] {
+    /**
+     * Collect keywords found in the section, based on identifier names.
+     * @param sourceMap The SourceMap of the file whose section contents should be collected.
+     * @param sectionStart The start of the section.
+     * @param sectionEnd The end of the section.
+     */
+    private collectKeywords(sourceMap: SourceMap, sectionStart: number, sectionEnd: number): string[] {
         const result: string[] = [];
-        let currentLine = sourceMap.sourceFile.getLineAndCharacterOfPosition(comment.end).line + 1;
+        let currentLine = sectionStart;
         let previousNode: ts.Node;
+        // Iterate over all lines in the section and collect contained keywords of their enclosing nodes
         while (currentLine <= sectionEnd) {
             if (sourceMap.getCommentsInLine(currentLine).length > 0) {
                 break;
@@ -95,11 +110,15 @@ export class CommentQualityEvaluator {
             }
             previousNode = enclosingNode;
             result.push(...this.collectKeywordsForNode(enclosingNode));
-            currentLine++;
+            currentLine = sourceMap.sourceFile.getLineAndCharacterOfPosition(enclosingNode.end).line + 1;
         }
         return result;
     }
 
+    /**
+     * Collect keywords, based on identifier names of the given node and its children.
+     * @param node The node that is the starting point for the analysis.
+     */
     private collectKeywordsForNode(node: ts.Node): string[] {
         const result: string[] = [];
         const addIdentifiersAndNames = (child: ts.Node) => {
