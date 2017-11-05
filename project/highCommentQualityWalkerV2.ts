@@ -373,70 +373,51 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
     private addCommentRequirements(node: ts.FunctionLikeDeclaration) {
         const startLine = this.sourceMap.sourceFile.getLineAndCharacterOfPosition(node.getStart()).line;
         const endLine = this.sourceMap.sourceFile.getLineAndCharacterOfPosition(node.getEnd()).line;
-        let sectionComplexity = 0.0;
         let totalComplexity = 0.0;
         const sortDescending = (a: ILineComplexity, b: ILineComplexity): number => {
             return a.complexity - b.complexity;
         };
-        const lineComplexities = new PriorityQueue<ILineComplexity>(sortDescending);
         const sectionComplexities = new PriorityQueue<ILineComplexity>(sortDescending);
-        const nodeLines = node.getText().split("\n");
-        let previousLineWasCommentOnly = false;
-        let possibleSections: Interval[];
+        const smallestFirstByAscLocation = (a: Interval, b: Interval) => {
+            const sizeA = a.high - a.low;
+            const sizeB = b.high - b.low;
+            if (sizeA === sizeB) { return a.low - b.low; }
+            return sizeA - sizeB;
+        };
+        const sections = this.sections.search(startLine, endLine);
+        sections.sort(smallestFirstByAscLocation);
 
-        for (let currentLine = startLine + 1; currentLine < endLine; ++currentLine) {
-            // const commentsInLine = this.sourceMap.getCommentsInLine(currentLine);
-            const enclosingNode = this.sourceMap.getMostEnclosingNodeForLine(currentLine);
-            const currentLineText = nodeLines[currentLine - startLine];
-            possibleSections = this.sections.search(currentLine, currentLine);
-            possibleSections = possibleSections.sort((a, b): number => b.low - a.low);
-            // No code in the current line, except for opening / closing braces
-            if (!enclosingNode) {
-                // TODO: this is just here for live-feedback purposes
-                const failureStart = this.sourceMap.sourceFile.getPositionOfLineAndCharacter(
-                        possibleSections[0].low, 0);
-                this.addFailureAt(failureStart, 1, "sectionComplexity: " + sectionComplexity);
-                // Save previous section complexity, as a new section starts
-                if (sectionComplexity > 0) {
-                    this.enforceCommentRequirementForSection(sectionComplexity,
-                                                             HighCommentQualityWalkerV2.sectionComplexityThreshold,
-                                                             possibleSections[0].low,
-                                                             lineComplexities,
-                                                             HighCommentQualityWalkerV2.lineComplexityThreshold);
-                    sectionComplexities.add({line: possibleSections[0].low,
-                                             complexity: sectionComplexity});
-                    sectionComplexity = 0;
-                }
-                lineComplexities.clear();
-                continue;
+        // TODO: optimize handling of nested sections
+        sections.forEach((section) => {
+            let sectionComplexity = 0.0;
+            const lineComplexities = new PriorityQueue<ILineComplexity>(sortDescending);
+            for (let currentLine = section.low; currentLine < section.high; currentLine++) {
+                const enclosingNode = this.sourceMap.getMostEnclosingNodeForLine(currentLine);
+                // An empty line or a comment
+                if (!enclosingNode) { continue; }
+                const lineOfCurrentNode =
+                        this.sourceFile.getLineAndCharacterOfPosition(enclosingNode.getStart()).line;
+                if (lineOfCurrentNode !== currentLine) { continue; }
+                const lineComplexity = this.getComplexityForNodesInLine(enclosingNode);
+                sectionComplexity += lineComplexity;
+                totalComplexity += lineComplexity;
+                lineComplexities.add({line: currentLine, complexity: lineComplexity});
             }
-            previousLineWasCommentOnly = false;
-
-            const lineOfCurrentNode =
-                    this.sourceFile.getLineAndCharacterOfPosition(enclosingNode.getStart()).line;
-            if (lineOfCurrentNode !== currentLine) { continue; }
-            const lineComplexity = this.getComplexityForNodesInLine(enclosingNode);
-            sectionComplexity += lineComplexity;
-            totalComplexity += lineComplexity;
-
-            lineComplexities.add({line: currentLine, complexity: lineComplexity});
-        }
-        possibleSections = this.sections.search(endLine, endLine);
-        possibleSections = possibleSections.sort((a, b): number => b.low - a.low);
-        // enforce section complexity for last section
-        if (sectionComplexity > 0) {
-            this.enforceCommentRequirementForSection(sectionComplexity,
-                                                     HighCommentQualityWalkerV2.sectionComplexityThreshold,
-                                                     possibleSections[0].low,
-                                                     lineComplexities,
-                                                     HighCommentQualityWalkerV2.lineComplexityThreshold);
-        }
+            if (sectionComplexity > 0) {
+                this.enforceCommentRequirementForSection(sectionComplexity,
+                                                         HighCommentQualityWalkerV2.sectionComplexityThreshold,
+                                                         section,
+                                                         lineComplexities,
+                                                         HighCommentQualityWalkerV2.lineComplexityThreshold);
+                sectionComplexities.add({line: section.low, complexity: sectionComplexity});
+            }
+        });
         if (totalComplexity > HighCommentQualityWalkerV2.nodeTotalComplexityThreshold) {
             this.enforceCommentRequirementForSection(totalComplexity,
                                                      HighCommentQualityWalkerV2.nodeTotalComplexityThreshold,
-                                                     startLine,
+                                                     sections[sections.length - 1],
                                                      sectionComplexities,
-                                                    HighCommentQualityWalkerV2.sectionComplexityThreshold);
+                                                     HighCommentQualityWalkerV2.sectionComplexityThreshold);
         }
     }
 
@@ -462,23 +443,23 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
      * Adds comment requirements to a part of code. Returns true, if a comment requirement has been added.
      * @param complexity The accumulated complexity of the section.
      * @param threshold The maximum complexity value that is allowed before a comment is required.
-     * @param sectionStartLine The line in which the section starts and where the comment requirement is added.
+     * @param section The interval of the section that should be checked.
      * @param lineComplexities Complexities for the next smaller unit (lines for sections, sections for functions).
      * @param lineThreshold The maximum complexity value for lines that is allowed before a comment is required.
      */
-    private enforceCommentRequirementForSection(complexity: number, threshold: number, sectionStartLine: number,
+    private enforceCommentRequirementForSection(complexity: number, threshold: number, section: Interval,
                                                 lineComplexities: PriorityQueue<ILineComplexity>,
                                                 lineThreshold: number) {
         if (complexity < threshold) {
             return false;
         }
-        if (!this.requireCommentForLine(sectionStartLine, this.sourceMap, "sectionstart: " + complexity)) {
+        if (!this.requireCommentForLine(section.low, this.sourceMap, "sectionstart: " + complexity + " - (" + section.low + "-" + section.high + ")")) {
             const findCommentRequirementLocation = (): boolean => {
                 const highestComplexity = lineComplexities.dequeue();
                 if (!highestComplexity || highestComplexity.complexity < lineThreshold) {
                     return true;
                 }
-                const reason = "most complex: " + highestComplexity.complexity + " - total: " + complexity;
+                const reason = "most complex: " + highestComplexity.complexity + " - total: " + complexity + " - (" + section.low + "-" + section.high + ")";
                 return this.requireCommentForLine(highestComplexity.line, this.sourceMap, reason);
             };
             // tslint:disable-next-line:no-empty
