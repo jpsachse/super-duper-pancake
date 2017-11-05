@@ -6,7 +6,7 @@ import { PriorityQueue } from "typescript-collections";
 import { CodeDetector } from "./codeDetector";
 import { ICommentClassification } from "./commentClassificationTypes";
 import { CommentClassifier } from "./commentClassifier";
-import { CommentQuality, CommentQualityEvaluator, IEvaluationResult } from "./commentQualityEvaluator";
+import { CommentQuality, CommentQualityEvaluator, EvaluationResult } from "./commentQualityEvaluator";
 // tslint:disable-next-line:max-line-length
 import { CyclomaticComplexityCollector, HalsteadCollector, LinesOfCodeCollector, NestingLevelCollector } from "./metricCollectors";
 import { CommentClass, SourceComment } from "./sourceComment";
@@ -14,7 +14,7 @@ import { SourceMap } from "./sourceMap";
 import Utils from "./utils";
 
 interface ICommentStatistics {
-    qualityEvaluation: IEvaluationResult;
+    qualityEvaluation: EvaluationResult;
     classifications: ICommentClassification[];
 }
 
@@ -398,7 +398,7 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
                 const lineOfCurrentNode =
                         this.sourceFile.getLineAndCharacterOfPosition(enclosingNode.getStart()).line;
                 if (lineOfCurrentNode !== currentLine) { continue; }
-                const lineComplexity = this.getComplexityForNodesInLine(enclosingNode);
+                const lineComplexity = this.getComplexityForNode(enclosingNode);
                 sectionComplexity += lineComplexity;
                 totalComplexity += lineComplexity;
                 lineComplexities.add({line: currentLine, complexity: lineComplexity});
@@ -421,16 +421,22 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
         }
     }
 
-    private getComplexityForNodesInLine(enclosingNode: ts.Node): number {
+    /**
+     * Searches for precalculated complexity measures for the given node. If none can be found,
+     * the search is continued on its childrend. If again none can be found, 0 is returned.
+     * @param enclosingNode The node whose complexity is requested.
+     */
+    private getComplexityForNode(enclosingNode: ts.Node): number {
         let complexity = this.nodeComplexities.get(enclosingNode);
         if (complexity) {
             return complexity;
         }
+        // Search for calculated complexities in the children of the given node.
         const children = enclosingNode.getChildren();
         for (const key in children) {
             if (children.hasOwnProperty(key)) {
                 const child = children[key];
-                complexity = this.getComplexityForNodesInLine(child);
+                complexity = this.getComplexityForNode(child);
                 if (complexity) {
                     return complexity;
                 }

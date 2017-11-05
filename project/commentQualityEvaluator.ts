@@ -14,11 +14,21 @@ export enum CommentQuality {
     High,
 }
 
-export interface IEvaluationResult {
-    quality: CommentQuality;
-    reasons: string[];
+export class EvaluationResult {
+
+    constructor(public quality: CommentQuality, public reasons: string[]) { }
+
+    public increaseQuality() {
+        this.quality = Math.min(this.quality + 1, CommentQuality.High);
+    }
+
+    public decreaseQuality() {
+        this.quality = Math.max(this.quality - 1, CommentQuality.Unhelpful);
+    }
+
 }
 
+// tslint:disable-next-line:max-classes-per-file
 export class CommentQualityEvaluator {
 
     private static WORD_MATCH_THRESHOLD = 0.5;
@@ -27,13 +37,13 @@ export class CommentQualityEvaluator {
     public evaluateQuality(comment: SourceComment,
                            classifications: ICommentClassification[],
                            sourceMap: SourceMap,
-                           sectionEndLine: number): IEvaluationResult {
+                           sectionEndLine: number): EvaluationResult {
         if (classifications.find((c) => c.lines === undefined &&
                 (c.commentClass === CommentClass.Task || c.commentClass === CommentClass.Annotation))) {
-            return {quality: CommentQuality.Unknown, reasons: []};
+            return new EvaluationResult(CommentQuality.Unknown, []);
         }
         if (classifications.find((c) => c.lines === undefined && c.commentClass === CommentClass.Code)) {
-            return {quality: CommentQuality.Unhelpful, reasons: ["Code should not be commented out"]};
+            return new EvaluationResult(CommentQuality.Unhelpful, ["Code should not be commented out"]);
         }
         const commentEndLine = sourceMap.sourceFile.getLineAndCharacterOfPosition(comment.end).line;
         let nextNode = sourceMap.getFirstNodeInLine(commentEndLine);
@@ -41,7 +51,7 @@ export class CommentQualityEvaluator {
             nextNode = sourceMap.getFirstNodeAfterLine(commentEndLine);
         }
         if (!nextNode) {
-            return {quality: CommentQuality.Unknown, reasons: []};
+            return new EvaluationResult(CommentQuality.Unknown, []);
         }
         // If this comment is a jsDoc comment, its end will lie within the JSDoc node, which will be
         // returned by getFirstNodeInLine, but we actually want to assess the quality relative to its parent.
@@ -56,18 +66,17 @@ export class CommentQualityEvaluator {
     }
 
     private assessInlineComment(comment: SourceComment, nextNode: ts.Node,
-                                sourceMap: SourceMap, sectionEndLine: number): IEvaluationResult {
+                                sourceMap: SourceMap, sectionEndLine: number): EvaluationResult {
         if (!nextNode) {
             // TODO: try to grasp a wider understanding of the section that follows a node
             // instead of just comparing it to the next node and its children
-            return {quality: CommentQuality.Unknown, reasons: []};
+            return new EvaluationResult(CommentQuality.Unknown, []);
         }
-        const evaluationResult = {quality: CommentQuality.Low, reasons: []};
+        const evaluationResult = new EvaluationResult(CommentQuality.Low, []);
 
-        // TODO: fix this and add the real section end
         const keywords = this.collectKeywords(comment, sourceMap, sectionEndLine);
         const codeContent = keywords.join("-");
-        this.assessQualityBasedOnName(comment.getSanitizedCommentText().text, codeContent, evaluationResult, 0.2);
+        this.evaluateContentOverlap(evaluationResult, comment.getSanitizedCommentText().text, codeContent, 0.5, 0.5);
         return evaluationResult;
     }
 
@@ -107,10 +116,10 @@ export class CommentQualityEvaluator {
 
     private assessDeclarationComment(comment: SourceComment,
                                      declaration: ts.Declaration,
-                                     sourceMap: SourceMap): IEvaluationResult {
+                                     sourceMap: SourceMap): EvaluationResult {
         // TODO: this has to be refined considerably, e.g., by stripping common fill words (a, this, any, ...)
         // and also add handling for texts that reference parameters of functions
-        const evaluationResult = {quality: CommentQuality.Low, reasons: []};
+        const evaluationResult = new EvaluationResult(CommentQuality.Low, []);
         const jsDocs = comment.getCompleteComment().jsDoc;
         let commentText: string;
         if (jsDocs.length > 0) {
@@ -127,10 +136,7 @@ export class CommentQualityEvaluator {
             additionalNameParts = this.getParameterNames(declaration);
         }
         name += " " + additionalNameParts.join(" ");
-        this.assessQualityBasedOnName(commentText,
-                                                name,
-                                                evaluationResult,
-                                                CommentQualityEvaluator.WORD_MATCH_THRESHOLD);
+        this.evaluateContentOverlap(evaluationResult, commentText, name, CommentQualityEvaluator.WORD_MATCH_THRESHOLD);
         return evaluationResult;
     }
 
@@ -154,14 +160,12 @@ export class CommentQualityEvaluator {
      * @param evaluationResult The result of the quality evaluation of the comment,
      * as assessed until the point of calling this method
      */
-    private assessJSDocComment(jsDoc: ts.JSDoc, declaration: ts.Declaration, evaluationResult: IEvaluationResult) {
-        const assessParamCommentQuality = (comment: string, parameter: ts.ParameterDeclaration): IEvaluationResult => {
-            const result = {quality: CommentQuality.Medium, reasons: []};
+    private assessJSDocComment(jsDoc: ts.JSDoc, declaration: ts.Declaration, evaluationResult: EvaluationResult) {
+        const assessParamCommentQuality = (comment: string, parameter: ts.ParameterDeclaration): EvaluationResult => {
+            const result = new EvaluationResult(CommentQuality.Medium, []);
             const parameterName = this.getNameOfDeclaration(parameter);
-            this.assessQualityBasedOnName(comment,
-                                          parameterName,
-                                          result,
-                                          CommentQualityEvaluator.PARAMETER_WORD_MATCH_THRESHOLD);
+            this.evaluateContentOverlap(result, comment, parameterName,
+                                        CommentQualityEvaluator.PARAMETER_WORD_MATCH_THRESHOLD);
             if (result.quality < CommentQuality.Medium) {
                 result.reasons[result.reasons.length - 1] += ": " + parameterName;
             }
@@ -182,7 +186,7 @@ export class CommentQualityEvaluator {
                 parameterCount++;
                 const parameterComment = jsDocParameterComments.get(child.name.getText());
                 if (!parameterComment) {
-                    this.decreaseQuality(evaluationResult);
+                    evaluationResult.decreaseQuality();
                     const failureReason = "Missing explanation for parameter: " + this.getNameOfDeclaration(child);
                     evaluationResult.reasons.push(failureReason);
                     return;
@@ -199,43 +203,45 @@ export class CommentQualityEvaluator {
         });
         if (parameterCount > 0) {
             if (lowQualityCommentParameterCount >= commentedParameterCount) {
-                this.decreaseQuality(evaluationResult);
+                evaluationResult.decreaseQuality();
             } else if (lowQualityCommentParameterCount < 0) {
-                this.increaseQuality(evaluationResult);
+                evaluationResult.increaseQuality();
             }
             if (commentedParameterCount < parameterCount) {
-                this.decreaseQuality(evaluationResult);
+                evaluationResult.decreaseQuality();
             }
         }
     }
 
-    private assessQualityBasedOnName(comment: string, nodeName: string,
-                                     quality: IEvaluationResult, threshold: number) {
-        const usefulCommentParts = this.normaliseWords(
-                    this.filterCommonWords(Utils.splitIntoNormalizedWords(comment))).sort();
+    private evaluateContentOverlap(evaluationResult: EvaluationResult, comment: string, nodeName: string,
+                                   commentCoverageThreshold: number, nameCoverageThreshold?: number) {
+        const usefulCommentParts = this.normaliseWords(this.filterCommonWords(Utils.splitWords(comment))).sort();
         if (usefulCommentParts.length === 0) {
-            this.decreaseQuality(quality);
+            evaluationResult.decreaseQuality();
             return;
         }
-        const nameParts = this.normaliseWords(
-                this.filterCommonWords(Utils.splitIntoNormalizedWords(nodeName))).sort();
+        const nameParts = this.normaliseWords(this.filterCommonWords(Utils.splitWords(nodeName))).sort();
         if (nameParts.length === 0) {
-            quality.quality = CommentQuality.Unknown;
-            quality.reasons.push("Could not create english wording for commented code");
+            evaluationResult.quality = CommentQuality.Unknown;
+            evaluationResult.reasons.push("Could not create english wording for commented code");
             return;
         }
         const intersection = Utils.getIntersection(nameParts, usefulCommentParts);
-        if (intersection.length === 0 || intersection.length / usefulCommentParts.length > threshold) {
-            if (intersection.length === 0) {
-                quality.reasons.push("No relation between comment and code could be found");
-            } else {
-                quality.reasons.push("Too much overlap between comment and code");
-            }
-            this.decreaseQuality(quality);
-        } else {
-            // TODO: more heuristics upon what is good comment text
-            this.increaseQuality(quality);
+        const nameCoverage = intersection.length / nameParts.length;
+        const commentCoverage = intersection.length / usefulCommentParts.length;
+
+        if (intersection.length === 0) {
+            evaluationResult.reasons.push("No relation between comment and code could be found");
+            evaluationResult.decreaseQuality();
+            return;
         }
+        if ((commentCoverage > commentCoverageThreshold) &&
+                (nameCoverageThreshold === undefined || nameCoverage > nameCoverageThreshold)) {
+            evaluationResult.reasons.push("Too much overlap between comment and code");
+            evaluationResult.decreaseQuality();
+            return;
+        }
+        evaluationResult.increaseQuality();
     }
 
     private filterCommonWords(words: string[]): string[] {
@@ -249,14 +255,6 @@ export class CommentQualityEvaluator {
             const normalized = inflector.infinitive(word);
             return normalized ? normalized : word;
         });
-    }
-
-    private increaseQuality(current: IEvaluationResult) {
-        current.quality = Math.min(current.quality + 1, CommentQuality.High);
-    }
-
-    private decreaseQuality(current: IEvaluationResult) {
-        current.quality = Math.max(current.quality - 1, CommentQuality.Unhelpful);
     }
 
 }
