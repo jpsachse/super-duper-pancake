@@ -131,4 +131,19 @@ describe("findSections", () => {
         expect(sections.search(12, 12)).to.deep.include({low: 12, high: 13});
     });
 
+    it("should correclty handle sections with nested newlines", () => {
+        const walker = createWalker("test/highCommentQualityWalkerTest/findSections.ts");
+        const sections = walker["sections"];
+        expect(sections.search(15, 28)).to.deep.equal([
+            {low: 15, high: 29}, // function start and end
+            {low: 16, high: 17}, // variable definition
+            {low: 19, high: 29}, // return start and end
+            {low: 20, high: 22}, // variable definitions in return statement
+            {low: 24, high: 28}, // for loop
+            {low: 25, high: 25}, // block of for loop
+            {low: 27, high: 27}, // closing line of for block after empty line
+        ]);
+
+    });
+
 });

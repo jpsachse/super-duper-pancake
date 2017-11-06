@@ -312,11 +312,38 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
         }
     }
 
+    /**
+     * Searches linearly through the source file to find a line that can be used to determine the nesting
+     * level of startLine.
+     * @param startLine The line the next available nesting level should be found for.
+     * @param summand The summand to be added to the line each time no nesting level could be determined.
+     * @param maxLine The threshold up (or down, if the summand is negative) to which the summand
+     * gets added to the startline.
+     */
+    private findNextAvailableNestingLevel(startLine: number, summand: number, maxLine: number): number | undefined {
+        if (summand === 0) { return undefined; }
+        let line = startLine + summand;
+        let node = this.sourceMap.getMostEnclosingNodeForLine(line) || this.sourceMap.getFirstNodeInLine(line);
+        // Iterate over lines up or down to maxLine, until a nesting level is determined
+        while (((line <= maxLine && summand > 0) || (line >= maxLine && summand < 0)) &&
+                (!node || !this.nestingLevelCollector.getNestingLevel(node))) {
+            line += summand;
+            node = this.sourceMap.getMostEnclosingNodeForLine(line);
+        }
+        return this.nestingLevelCollector.getNestingLevel(node);
+    }
+
     private findSections() {
         const functions = this.sourceMap.getAllFunctionLikes();
         functions.forEach( (functionLike) => {
             const functionStartLine = this.sourceFile.getLineAndCharacterOfPosition(functionLike.getStart()).line;
             const functionEndLine =  this.sourceFile.getLineAndCharacterOfPosition(functionLike.end).line;
+            const eligibleSections = this.sections.search(functionStartLine, functionStartLine);
+            if (eligibleSections.length > 0 &&
+                    eligibleSections[0].low <= functionStartLine &&
+                    eligibleSections[0].high >= functionEndLine) {
+                return;
+            }
             const findSectionInSection = (startLine: number, nestingLevel: number): number => {
                 let previousLineWasCommentOnly = false;
                 let currentSectionStartLine = startLine;
@@ -326,24 +353,30 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
                     const enclosingNode = this.sourceMap.getMostEnclosingNodeForLine(currentLine);
                     const firstNodeInLine = this.sourceMap.getFirstNodeInLine(currentLine);
                     const usableNode = enclosingNode || firstNodeInLine;
+                    let currentNestingLevel = this.nestingLevelCollector.getNestingLevel(usableNode);
                     if (!usableNode) {
                         // Only comments in the current line
                         if (commentsInLine.length > 0 && !previousLineWasCommentOnly) {
                             previousLineWasCommentOnly = true;
                             continue;
-                        } // TODO: don't do this if currentsectionstartline is -1 (multiple empty lines)
-                        if (currentSectionStartLine > -1) {
-                            this.sections.insert({low: currentSectionStartLine, high: currentSectionEndLine});
                         }
-                        currentSectionStartLine = -1;
-                        continue;
+                        const previousNestingLevel = this.findNextAvailableNestingLevel(currentLine, -1, startLine);
+                        const nextNestingLevel = this.findNextAvailableNestingLevel(currentLine, +1, functionEndLine);
+                        if (previousNestingLevel === nextNestingLevel) {
+                            if (currentSectionStartLine > -1) {
+                                this.sections.insert({low: currentSectionStartLine, high: currentSectionEndLine});
+                            }
+                            currentSectionStartLine = -1;
+                            continue;
+                        }
+                        currentNestingLevel = Math.max(previousNestingLevel, nextNestingLevel);
                     }
                     if (currentSectionStartLine === -1) {
                         // TODO: get the correct starting line, as this might be one (or several) lines too far
                         currentSectionStartLine = currentLine;
                     }
-                    const currentNestingLevel = this.nestingLevelCollector.getNestingLevel(usableNode);
-                    previousLineWasCommentOnly = false;
+
+                    previousLineWasCommentOnly = !usableNode && commentsInLine.length > 0;
                     if (currentNestingLevel > nestingLevel) {
                         currentLine = findSectionInSection(currentLine, currentNestingLevel);
                         currentSectionEndLine = currentLine;
@@ -387,7 +420,6 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
         const sections = this.sections.search(startLine, endLine);
         sections.sort(smallestFirstByAscLocation);
 
-        // TODO: optimize handling of nested sections
         sections.forEach((section) => {
             let sectionComplexity = 0.0;
             const lineComplexities = new PriorityQueue<ILineComplexity>(sortDescending);

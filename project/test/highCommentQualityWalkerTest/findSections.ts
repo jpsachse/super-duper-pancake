@@ -12,3 +12,19 @@ function aFunction(withAParameter: number): number {
     // comment
     return varTest;
 }
+
+function anotherFunction(withAParameter: number): number {
+
+    const instantiationService = { invokeFunction: (a) => a() };
+
+    return instantiationService.invokeFunction((aVariable) => {
+
+        const aConstant = 5;
+        let aVariable = 42;
+
+        for (let i = 0; i < aConstant; ++i) {
+            aVariable += aConstant * Math.random();
+
+        }
+    });
+}
