@@ -22,14 +22,14 @@ export class NestingLevelCollector implements IMetricCollector {
             lineOfParent = ts.getLineAndCharacterOfPosition(sourceFile, parent.getStart()).line;
             if (TSUtils.isFunctionScopeBoundary(parent) ||
                     TSUtils.isBlockScopeBoundary(parent) ||
-                    this.isConditionalScoped(currentNode)) {
+                    (!ts.isBlock(currentNode) && this.isConditionalScoped(currentNode))) {
                 nestingLevel++;
             }
             currentNode = parent;
         }
         if (TSUtils.isFunctionScopeBoundary(parent) ||
                 TSUtils.isBlockScopeBoundary(parent) ||
-                this.isConditionalScoped(currentNode)) {
+                (!ts.isBlock(currentNode) && this.isConditionalScoped(currentNode))) {
             nestingLevel++;
         }
         if (this.nestingLevels.has(node)) {
@@ -38,7 +38,8 @@ export class NestingLevelCollector implements IMetricCollector {
         this.nestingLevels.set(node, nestingLevel);
     }
 
-    public getNestingLevel(node: ts.Node): number | undefined {
+    public getNestingLevel(node?: ts.Node): number | undefined {
+        if (!node) { return undefined; }
         let nestingLevel = this.nestingLevels.get(node);
         if (nestingLevel) { return nestingLevel; }
         this.visitNode(node);
@@ -46,6 +47,11 @@ export class NestingLevelCollector implements IMetricCollector {
         return nestingLevel;
     }
 
+    /**
+     * Checks, whether the given node is a direct descendant of a conditional statement
+     * (i.e., an IfStatement or an IterationStatement).
+     * @param node The node to be checked
+     */
     private isConditionalScoped(node: ts.Node): boolean {
         const parent = node.parent;
         if (!parent) { return false; }
