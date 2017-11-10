@@ -20,3 +20,12 @@ function thisIsHereSoThatICanFindTheComment() {}
 // ```
 // console.log()
 function thisIsHereSoThatICanFindTheCommentv2() {}
+
+function test() {
+    // Here is a comment that is indented.
+    // console.log();
+    // ```
+    // console.log();
+    // ```
+    if (true) { return; }
+}
