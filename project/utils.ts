@@ -100,7 +100,7 @@ export default class Utils {
      * Will also strip basic latin punctuation characters from the words.
      * @param camelCaseText Text with camelcase words in it. The text will be split along camelCasing and whitespace.
      */
-    public static splitIntoNormalizedWords(camelCaseText: string): string[] {
+    public static splitWords(camelCaseText: string): string[] {
         return Array.from(new Set(camelCaseText.replace(/([0-9])([a-zA-Z])/g, "$1 $2")
                     .replace(/([a-zA-Z])([0-9])/g, "$1 $2")
                     .replace(/([a-z])([A-Z])/g, "$1 $2")
