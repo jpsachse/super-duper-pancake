@@ -65,7 +65,16 @@ export default class Utils {
     }
 
     public static isJSDocTag(node: ts.Node): node is ts.JSDocTag {
-        return node.kind === ts.SyntaxKind.JSDocTag;
+        return node.kind === ts.SyntaxKind.JSDocTag ||
+                node.kind === ts.SyntaxKind.JSDocAugmentsTag ||
+                node.kind === ts.SyntaxKind.JSDocClassTag ||
+                node.kind === ts.SyntaxKind.JSDocTemplateTag ||
+                node.kind === ts.SyntaxKind.JSDocReturnTag ||
+                node.kind === ts.SyntaxKind.JSDocTypeTag ||
+                node.kind === ts.SyntaxKind.JSDocTypedefTag ||
+                node.kind === ts.SyntaxKind.JSDocPropertyTag ||
+                node.kind === ts.SyntaxKind.JSDocTypeLiteral ||
+                node.kind === ts.SyntaxKind.JSDocParameterTag;
     }
 
     public static trimTrailingSpace(aString: string): string {

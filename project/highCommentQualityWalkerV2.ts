@@ -128,27 +128,35 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
                     currentIndex++;
                 }
             }
-            jsDoc.forEachChild((child: ts.Node) => {
+            const commentStartLine = this.sourceFile.getLineAndCharacterOfPosition(jsDoc.pos).line;
+            jsDoc.forEachChild((childTag: ts.Node) => {
                 currentIndex = 0;
+                if (!Utils.isJSDocTag(childTag)) {
+                    return;
+                }
+                const tagLabel =  childTag.getFullText();
+                const tagCommentLines = childTag.comment.split("\n");
+                const tagCommentPos = childTag.pos + tagLabel.length;
+                const tagCommentStartLine = this.sourceFile.getLineAndCharacterOfPosition(tagCommentPos).line;
+                const tagCommentStartLineInJsdoc = tagCommentStartLine - commentStartLine;
+                // TODO: test this.
+                // -1, as the first line of tagCommentLines is in the same line, as the end of the tag label
+                const tagCommentEndLineInJsdoc = tagCommentStartLineInJsdoc + tagCommentLines.length - 1;
                 while (currentIndex < unacceptableLines.length) {
-                    if (!Utils.isJSDocTag(child)) {
+                    const codeLineInJsdoc = unacceptableLines[currentIndex];
+                    if (tagCommentStartLineInJsdoc > codeLineInJsdoc || tagCommentEndLineInJsdoc < codeLineInJsdoc) {
                         currentIndex++;
                         continue;
                     }
-                    const codeLineNumber = unacceptableLines[currentIndex];
-                    const tagStartLine = this.sourceFile.getLineAndCharacterOfPosition(child.pos).line;
-                    const tagEndPos = child.end + child.comment.length;
-                    const tagEndLine = this.sourceFile.getLineAndCharacterOfPosition(tagEndPos).line;
-                    const codeText = commentLines[codeLineNumber].text;
-                    if (tagStartLine > codeLineNumber || tagEndLine < codeLineNumber) {
-                        currentIndex++;
-                        continue;
+                    const codeLineInTagComment = codeLineInJsdoc - tagCommentStartLineInJsdoc;
+                    const codeLineText = tagCommentLines[codeLineInTagComment];
+                    let codePos = 0;
+                    for (let i = 0; i < codeLineInTagComment; ++i) {
+                        codePos += tagCommentLines[i].length + 1;
                     }
-                    const codePos = commentLines[codeLineNumber].pos - child.pos;
-                    const codeLineText = commentLines[codeLineNumber].text;
-                    if (child.tagName.text === "example" && child.comment.includes(codeText)) {
+                    if (childTag.tagName.text === "example") {
                         unacceptableLines.splice(currentIndex, 1);
-                    } else if (this.isEscapedCode(codeLineText, child.getFullText(), child.end - child.pos, codePos)) {
+                    } else if (this.isEscapedCode(codeLineText, childTag.comment, childTag.comment.length, codePos)) {
                         unacceptableLines.splice(currentIndex, 1);
                     } else {
                         currentIndex++;
@@ -189,10 +197,12 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
         // Iterate over all escaped comment parts to see, whether the code actually lies in one.
         while (match) {
             const matchText = match.toString();
-            if (match.index > codePosition || match.index + matchText.length < codePosition + codeText.length) {
+            if (match.index > codePosition) {
                 return false;
             }
-            if (matchText.includes(codeText)) { return true; }
+            const matchEnd = match.index + matchText.length;
+            const codeEnd = codePosition + codeText.length;
+            if (matchText.includes(codeText) && matchEnd >= codeEnd) { return true; }
             match = acceptableRegex.exec(commentText);
         }
         return false;

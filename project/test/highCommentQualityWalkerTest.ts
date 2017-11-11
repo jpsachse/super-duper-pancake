@@ -92,7 +92,6 @@ describe("filterLinesInUnacceptableContext", () => {
         expect(unacceptableLines).to.include(6);
         expect(unacceptableLines).to.include(9);
         expect(unacceptableLines).to.include(10);
-        expect(unacceptableLines).to.include(11);
     });
 
     it("should not filter code that is not escaped in indented comments", () => {
@@ -114,6 +113,24 @@ describe("filterLinesInUnacceptableContext", () => {
         const walker = createWalker("test/highCommentQualityWalkerTest/filterLinesInUnacceptableContext.ts");
         const commentStats = walker["commentStats"];
         const iterator = commentStats.entries();
+        iterator.next();
+        iterator.next();
+        const commentClassification = iterator.next().value;
+        const comment = commentClassification[0];
+        const codeClassification = commentClassification[1].classifications.find((c) => {
+            return c.commentClass === CommentClass.Code;
+        });
+        const unacceptableLines = walker["getUnescapedCodeLines"](codeClassification, comment);
+        expect(unacceptableLines).to.not.include(2);
+        expect(unacceptableLines).to.not.include(3);
+        expect(unacceptableLines).to.not.include(4);
+    });
+
+    it("should filter code that is escaped in JSDoc child tags", () => {
+        const walker = createWalker("test/highCommentQualityWalkerTest/filterLinesInUnacceptableContext.ts");
+        const commentStats = walker["commentStats"];
+        const iterator = commentStats.entries();
+        iterator.next();
         iterator.next();
         iterator.next();
         const commentClassification = iterator.next().value;

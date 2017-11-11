@@ -29,3 +29,10 @@ function test() {
     // ```
     if (true) { return; }
 }
+
+/**
+ * This is a test JSDoc comment.
+ * @param ``` this.is.allowed();```
+ * ``` this.is.allowed.as.well();```
+ */
+function test2() {}

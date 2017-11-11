@@ -9,6 +9,43 @@ export class TsCompilerBasedCodeDetector extends CodeDetector {
     // based on https://gist.github.com/teppeis/6e0f2d823a94de4ae442
     public classify(comment: SourceComment): ICommentClassification[] {
         const classifications: ICommentClassification[] = [];
+        const jsDocs = comment.getCompleteComment().jsDoc;
+        const commentLines = comment.getSanitizedCommentLines().map((line) => line.text);
+        if (jsDocs.length === 0) {
+            const lines = this.classifyLinesOfText(commentLines);
+            if (lines.length > 0) {
+                const classification = this.defaultClassification;
+                if (lines.length === commentLines.length) { return [classification]; }
+                classification.lines = lines;
+                classifications.push(classification);
+            }
+            return classifications;
+        }
+        const codeLines: number[] = [];
+        jsDocs.forEach((jsDoc) => {
+            let textLines = jsDoc.comment.split("\n");
+            // increase line index by 1, as the text of JSDoc comments generally starts in the second line
+            codeLines.push(...this.classifyLinesOfText(textLines).map((line) => line + 1));
+            let lineOffset = textLines.length + 1;
+            jsDoc.forEachChild((child) => {
+                if (Utils.isJSDocTag(child)) {
+                    textLines = child.comment.split("\n");
+                    const childCodeLines = this.classifyLinesOfText(textLines).map((line) => line + lineOffset);
+                    codeLines.push(...childCodeLines);
+                    lineOffset += childCodeLines.length;
+                }
+            });
+        });
+        if (codeLines.length > 0) {
+            const classification = this.defaultClassification;
+            if (codeLines.length === commentLines.length) { return [classification]; }
+            classification.lines = codeLines;
+            classifications.push(classification);
+        }
+        return classifications;
+    }
+
+    private classifyLinesOfText(textLines: string[]): number[] {
         const lines: number[] = [];
         let commentText: string;
         const compilerOptions: ts.CompilerOptions = {};
@@ -30,19 +67,18 @@ export class TsCompilerBasedCodeDetector extends CodeDetector {
             useCaseSensitiveFileNames: () => false,
             writeFile: (name, text, writeByteOrderMark) => { return; },
         };
-        const commentLines = comment.getSanitizedCommentLines();
         // Try compiling the comment text with available subsets of continuous lines.
         let start = 0;
-        let end = commentLines.length - 1;
-        while (start < commentLines.length) {
+        let end = textLines.length - 1;
+        while (start < textLines.length) {
             while (start <= end) {
-                commentText = commentLines.slice(start, end + 1).map((line) => line.text).join("\n");
+                commentText = textLines.slice(start, end + 1).join("\n");
                 commentText = commentText.replace(/^\s+|\s+$/g, "");
                 if (commentText.length > 0) {
                     const errors = this.getSyntacticErrors(compilerOptions, compilerHost);
                     if (errors.length === 0) {
-                        if (start === 0 && end === commentLines.length - 1) {
-                            return [this.defaultClassification];
+                        if (start === 0 && end === textLines.length - 1) {
+                            return Utils.createRange(start, end);
                         }
                         lines.push(...Utils.createRange(start, end));
                         start = end;
@@ -52,14 +88,9 @@ export class TsCompilerBasedCodeDetector extends CodeDetector {
                 end--;
             }
             start++;
-            end = commentLines.length - 1;
+            end = textLines.length - 1;
         }
-        if (lines.length > 0) {
-            const classification = this.defaultClassification;
-            classification.lines = lines;
-            classifications.push(classification);
-        }
-        return classifications;
+        return lines;
     }
 
     private getSyntacticErrors(compilerOptions: ts.CompilerOptions,
