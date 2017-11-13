@@ -30,6 +30,11 @@ export class TsCompilerBasedCodeDetector extends CodeDetector {
             jsDoc.forEachChild((child) => {
                 if (Utils.isJSDocTag(child)) {
                     textLines = child.comment.split("\n");
+                    // On Windows, multiline descriptions of parameters in JSDoc comments are not using
+                    // \r\n, but only \r.
+                    if (textLines.length === 1) {
+                        textLines = child.comment.split("\r");
+                    }
                     const childCodeLines = this.classifyLinesOfText(textLines).map((line) => line + lineOffset);
                     codeLines.push(...childCodeLines);
                     lineOffset += childCodeLines.length;

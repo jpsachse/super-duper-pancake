@@ -135,7 +135,12 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
                     return;
                 }
                 const tagLabel =  childTag.getFullText();
-                const tagCommentLines = childTag.comment.split("\n");
+                let tagCommentLines = childTag.comment.split("\n");
+                // On Windows, multiline descriptions of parameters in JSDoc comments are not using
+                // \r\n, but only \r.
+                if (tagCommentLines.length === 1) {
+                    tagCommentLines = childTag.comment.split("\r");
+                }
                 const tagCommentPos = childTag.pos + tagLabel.length;
                 const tagCommentStartLine = this.sourceFile.getLineAndCharacterOfPosition(tagCommentPos).line;
                 const tagCommentStartLineInJsdoc = tagCommentStartLine - commentStartLine;

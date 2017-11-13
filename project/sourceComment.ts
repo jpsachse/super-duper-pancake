@@ -89,11 +89,17 @@ export class SourceComment implements TextRange {
                     text: line,
                     jsDoc: part.jsDoc,
                 };
-                relativePos += line.length + 1;
                 // + 1 to include the removed newline character
+                relativePos += line.length + 1;
                 pos += lineLength + 1;
                 return result;
             });
+            // One-line comments do not include the newline chars in their text.
+            // The \r char does not hurt in multiline comments, as it is included in line.length (above)
+            // But since it's not in this case, we have to +1 once more
+            if (cleansedLines.length === 1 && Utils.isWindows()) {
+                relativePos++;
+            }
             currentPartStartLine += cleansedLines.length;
             return sanitizedLines;
         });
