@@ -280,8 +280,8 @@ export class CommentQualityEvaluator {
             return;
         }
         // The comment might add no additional information and thus be unhelpful
-        if ((commentCoverage > commentCoverageThreshold) &&
-                (nameCoverageThreshold === undefined || nameCoverage > nameCoverageThreshold)) {
+        if ((commentCoverage >= commentCoverageThreshold) &&
+                (nameCoverageThreshold === undefined || nameCoverage >= nameCoverageThreshold)) {
             evaluationResult.reasons.push("Too much overlap between comment and code");
             evaluationResult.decreaseQuality();
             return;
