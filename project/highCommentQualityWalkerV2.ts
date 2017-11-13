@@ -70,10 +70,18 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
     }
 
     private classifyComments() {
+        const closestToComment = (a: Interval, b: Interval): number => {
+            const bigger = b.low - a.low;
+            if (bigger !== 0) {
+                return bigger;
+            }
+            return (b.high - b.low) - (a.high - a.low);
+        };
+
         this.sourceMap.getAllComments().forEach((comment) => {
             const commentEndLine = this.sourceFile.getLineAndCharacterOfPosition(comment.end).line;
             let possibleSections = this.sections.search(commentEndLine + 1, commentEndLine + 1);
-            possibleSections = possibleSections.sort((a, b) => a.low - b.low);
+            possibleSections = possibleSections.sort(closestToComment);
             const sectionEndLine = possibleSections.length > 0 ? possibleSections[0].high : commentEndLine;
             const classifications = this.commentClassifier.classify(comment);
             const evaluationResult = this.commentQualityEvaluator.evaluateQuality(comment,
