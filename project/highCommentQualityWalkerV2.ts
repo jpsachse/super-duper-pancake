@@ -384,16 +384,15 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
                             previousLineWasCommentOnly = true;
                             continue;
                         }
-                        const previousNestingLevel = this.findNextAvailableNestingLevel(currentLine, -1, startLine);
                         const nextNestingLevel = this.findNextAvailableNestingLevel(currentLine, +1, functionEndLine);
-                        if (previousNestingLevel === nextNestingLevel) {
+                        if (nestingLevel === nextNestingLevel) {
                             if (currentSectionStartLine > -1) {
                                 this.sections.insert({low: currentSectionStartLine, high: currentSectionEndLine});
                             }
                             currentSectionStartLine = -1;
                             continue;
                         }
-                        currentNestingLevel = Math.max(previousNestingLevel, nextNestingLevel);
+                        currentNestingLevel = Math.min(nestingLevel, nextNestingLevel);
                     }
                     if (currentSectionStartLine === -1) {
                         // TODO: get the correct starting line, as this might be one (or several) lines too far
