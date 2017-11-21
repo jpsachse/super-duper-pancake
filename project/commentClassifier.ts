@@ -64,6 +64,9 @@ export class CommentClassifier {
         classifications.push(...this.annotationMatcher.classify(comment));
         classifications.push(...this.codeDetector.classify(comment));
         classifications.push(...this.taskCommentMatcher.classify(comment));
+        if (classifications.length === 0) {
+            classifications.push({commentClass: CommentClass.Unknown});
+        }
         return classifications;
     }
 

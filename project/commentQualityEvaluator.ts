@@ -45,8 +45,7 @@ export class CommentQualityEvaluator {
                            classifications: ICommentClassification[],
                            sourceMap: SourceMap,
                            sectionEndLine: number): EvaluationResult {
-        if (classifications.find((c) => c.lines === undefined &&
-                (c.commentClass === CommentClass.Task || c.commentClass === CommentClass.Annotation))) {
+        if (classifications.find((c) => c.lines === undefined && this.nonEvaluableClass(c.commentClass))) {
             return new EvaluationResult(CommentQuality.Unknown, []);
         }
         if (classifications.find((c) => c.lines === undefined && c.commentClass === CommentClass.Code)) {
@@ -70,6 +69,12 @@ export class CommentQualityEvaluator {
         } else {
             return this.assessInlineComment(comment, sourceMap, sectionEndLine);
         }
+    }
+
+    private nonEvaluableClass(commentClass: CommentClass): boolean {
+        return commentClass === CommentClass.Task ||
+               commentClass === CommentClass.Annotation ||
+               commentClass === CommentClass.Unknown;
     }
 
     /**
