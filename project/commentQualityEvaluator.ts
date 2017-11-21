@@ -65,9 +65,9 @@ export class CommentQualityEvaluator {
             nextNode = nextNode.parent;
         }
         if (Utils.isDeclaration(nextNode)) {
-            return this.assessDeclarationComment(comment, nextNode, sourceMap);
+            return this.assessDeclarationComment(comment, nextNode, sourceMap, classifications);
         } else {
-            return this.assessInlineComment(comment, sourceMap, sectionEndLine);
+            return this.assessInlineComment(comment, sourceMap, sectionEndLine, classifications);
         }
     }
 
@@ -83,13 +83,16 @@ export class CommentQualityEvaluator {
      * @param sourceMap The SourceMap of the file the comment is located in.
      * @param sectionEndLine The last line of the section the comment is associated with.
      */
-    private assessInlineComment(comment: SourceComment, sourceMap: SourceMap,
-                                sectionEndLine: number): EvaluationResult {
+    private assessInlineComment(comment: SourceComment,
+                                sourceMap: SourceMap,
+                                sectionEndLine: number,
+                                classifications: ICommentClassification[]): EvaluationResult {
         const evaluationResult = new EvaluationResult(CommentQuality.Low, []);
         const startLine = sourceMap.sourceFile.getLineAndCharacterOfPosition(comment.end).line + 1;
         const keywords = this.collectKeywords(sourceMap, startLine, sectionEndLine);
         const codeContent = keywords.join("-");
-        this.evaluateContentOverlap(evaluationResult, comment.getSanitizedCommentText().text, codeContent, 0.5, 0.5);
+        const commentText = this.filterCodeLines(comment.getSanitizedCommentText().text, classifications);
+        this.evaluateContentOverlap(evaluationResult, commentText, codeContent, 0.5, 0.5);
         return evaluationResult;
     }
 
@@ -146,7 +149,8 @@ export class CommentQualityEvaluator {
      */
     private assessDeclarationComment(comment: SourceComment,
                                      declaration: ts.Declaration,
-                                     sourceMap: SourceMap): EvaluationResult {
+                                     sourceMap: SourceMap,
+                                     classifications: ICommentClassification[]): EvaluationResult {
         // TODO: this has to be refined considerably, e.g., by stripping common fill words (a, this, any, ...)
         // and also add handling for texts that reference parameters of functions
         const evaluationResult = new EvaluationResult(CommentQuality.Low, []);
@@ -156,7 +160,7 @@ export class CommentQualityEvaluator {
             commentText = jsDocs.map((jsDoc) => jsDoc.comment).join("\n");
             this.assessJSDocComment(jsDocs[jsDocs.length - 1], declaration, evaluationResult);
         } else {
-            commentText = comment.getSanitizedCommentText().text;
+            commentText = this.filterCodeLines(comment.getSanitizedCommentText().text, classifications);
         }
         let name = this.getNameOfDeclaration(declaration);
         let additionalNameParts: string[] = [];
@@ -168,6 +172,21 @@ export class CommentQualityEvaluator {
         name += " " + additionalNameParts.join(" ");
         this.evaluateContentOverlap(evaluationResult, commentText, name, CommentQualityEvaluator.WORD_MATCH_THRESHOLD);
         return evaluationResult;
+    }
+
+    private filterCodeLines(text: string, classifications: ICommentClassification[]): string {
+        const codeClassifications = classifications.filter((c) => c.commentClass === CommentClass.Code);
+        if (codeClassifications.length > 0) {
+            // lines will not be undefined, as it would have been caught before and this method
+            // would not have been called
+            const codeLines = Utils.flatten(codeClassifications.map((c) => c.lines));
+            let lines = text.split("\n");
+            for (let i = codeLines.length - 1; i >= 0; --i) {
+                lines.splice(codeLines[i], 1);
+            }
+            text = lines.join("\n");
+        }
+        return text;
     }
 
     private getParameterNames(declaration: ts.FunctionLikeDeclaration): string[] {
