@@ -12,6 +12,7 @@ export class LinesOfCodeCollector implements IMetricCollector {
             return;
         }
         let codeNode: ts.Node;
+        // TODO: handle loops
         if (ts.isFunctionLike(node)) {
             codeNode = node.body;
         } else if (ts.isIfStatement(node)) {
@@ -30,18 +31,10 @@ export class LinesOfCodeCollector implements IMetricCollector {
         const textLines = codeNode.getText(sourceFile).split("\n");
         let linesOfCode = 0;
         let position = codeNode.getStart();
-        let didIncludeCodePreviously = false;
-        let skippedLines = 0;
 
-        textLines.forEach((line) => {
-            const potentiallyContainsCode = !this.containsOnlyBraces(line);
-            if (!potentiallyContainsCode && didIncludeCodePreviously) {
-                skippedLines++;
-            }
-            if (potentiallyContainsCode && Utils.isCodeInLine(position, sourceFile, line)) {
-                didIncludeCodePreviously = true;
-                linesOfCode += skippedLines + 1;
-                skippedLines = 0;
+        textLines.forEach((line, index) => {
+            if (Utils.isCodeInLine(position, sourceFile, line)) {
+                linesOfCode += 1;
             }
             position += line.length + 1;
         });
@@ -50,10 +43,6 @@ export class LinesOfCodeCollector implements IMetricCollector {
 
     public getLoc(node: ts.Node): number {
         return this.linesOfCode.get(node) || 0;
-    }
-
-    private containsOnlyBraces(text: string): boolean {
-        return /^\s*[{|}]+\s*$/.test(text);
     }
 
 }

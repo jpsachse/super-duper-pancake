@@ -45,3 +45,11 @@ abstract class AnAbstractClass {
     public abstract withAnAbstractFunction();
 
 }
+
+function strechedEverything()
+{
+    if (Math.random() > 0.5)
+    {
+        console.log("Hello, world!");
+    }
+}

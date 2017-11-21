@@ -18,23 +18,23 @@ describe("visitNode", () => {
     }
 
     it("should count all lines with code in them", () => {
-        expectLinesOfCodeForFunction(0, 2);
+        expectLinesOfCodeForFunction(0, 4);
     });
 
     it("should ignore empty lines", () => {
-        expectLinesOfCodeForFunction(1, 2);
+        expectLinesOfCodeForFunction(1, 4);
     });
 
     it("should ignore comment-only lines", () => {
-        expectLinesOfCodeForFunction(2, 2);
+        expectLinesOfCodeForFunction(2, 4);
     });
 
     it("should count code lines even when they start and end with a comment", () => {
-        expectLinesOfCodeForFunction(3, 3);
+        expectLinesOfCodeForFunction(3, 5);
     });
 
     it("should ignore comment-only lines with multiple comments", () => {
-        expectLinesOfCodeForFunction(4, 2);
+        expectLinesOfCodeForFunction(4, 4);
     });
 
     it("should include lines with code and braces in them", () => {
@@ -42,7 +42,7 @@ describe("visitNode", () => {
     });
 
     it("should ignore enclosing brace lines, but include inner braces", () => {
-        expectLinesOfCodeForFunction(6, 5);
+        expectLinesOfCodeForFunction(6, 7);
     });
 
     it("should not calculate LOC for a function without body", () => {
@@ -52,6 +52,10 @@ describe("visitNode", () => {
         const locMap = collector["linesOfCode"] as Map<ts.Node, number>;
         // tslint:disable-next-line:no-unused-expression
         expect(locMap.get(node)).to.be.undefined;
+    });
+
+    it("should ignore stuff", () => {
+        expectLinesOfCodeForFunction(8, 6);
     });
 
 });
