@@ -248,7 +248,7 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
             complexity += childComplexity.complexity;
         });
         if (ts.isCallLikeExpression(node) || ts.isBinaryExpression(node) ||
-                ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression (node)) {
+                ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node)) {
             complexity += 0.4 * Math.pow(2, maxChildExpressionNestingDepth);
             maxChildExpressionNestingDepth++;
         } else {
@@ -552,8 +552,9 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
                 return classification.commentClass === CommentClass.Annotation && !classification.lines;
             };
             if (stats.classifications.some(isAnnotation)) { return false; }
-            return stats.qualityEvaluation.quality > CommentQuality.Low &&
-                commentDistance.distance <= stats.qualityEvaluation.quality - CommentQuality.Low + 1;
+            const quality = stats.qualityEvaluation.quality;
+            return quality > CommentQuality.Low && quality !== CommentQuality.Unknown &&
+                    commentDistance.distance <= quality - CommentQuality.Low + 1;
         });
 
         // Try to find comments that are close in terms of nesting-level
