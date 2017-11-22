@@ -15,7 +15,7 @@ export class AsapScheduler extends AsyncScheduler {
 
         do {
             if (error = action.execute(action.state, action.delay)) {
-            break;
+                break;
             }
         } while (++index < count && (action = actions.shift()));
 
@@ -23,7 +23,7 @@ export class AsapScheduler extends AsyncScheduler {
 
         if (error) {
             while (++index < count && (action = actions.shift())) {
-            action.unsubscribe();
+                action.unsubscribe();
             }
             throw error;
         }
