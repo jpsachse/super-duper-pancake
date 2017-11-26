@@ -1,7 +1,7 @@
 import csv
 import json
 import re
-from pprint import pprint
+from natural_keys import natural_keys
 from itertools import groupby
 
 
@@ -17,7 +17,13 @@ class QuestionColumns:
     marked1, marked1a, marked2, marked2a, marked3, marked3a, marked4, marked4a, marked5, marked5a, marked6,\
         marked6a, marked7, marked7a, marked8, marked8a, marked9, marked9a, marked10, marked10a = range(17, 37)
 
+class ChartLabels:
+    xAxisFreeQuestions = "Comment Requirement Location Line Numbers"
+    xAxisPreFilledQuestions = "Highlighted Comment Requirement Locations"
 
+# mapping from question name to identifier, e.g., "Question 11" => "marked1"
+QUESTION_NAMES = {"Question " + str(x): "q" + str(x) for x in range(1, 11)}
+QUESTION_NAMES.update({"Question " + str(x + 10): "marked" + str(x) for x in range(1, 11)})
 TS_DEVS_ONLY = False
 
 filenames = []
@@ -65,15 +71,30 @@ with open(chart_template_filename) as chart_template_file:
     chart_template = chart_template_file.read()
 
 all_charts = []
-for question, matched_prediction in matched_predictions.iteritems():
+for question_name in sorted(QUESTION_NAMES.iterkeys(), key=natural_keys):
+    question_identifier = QUESTION_NAMES[question_name]
+    matched_prediction = matched_predictions[question_identifier]
     current_chart = chart_template
-    current_chart = current_chart.replace("PLACEHOLDER_CAPTION", question)
+    survey_image_path = "survey_images/"
+    if question_identifier.startswith("q"):
+        survey_image_path += "01_unmarked/"
+        current_chart = current_chart.replace("PLACEHOLDER_X_LABEL", ChartLabels.xAxisFreeQuestions)
+    else:
+        survey_image_path += "02_marked/"
+        current_chart = current_chart.replace("PLACEHOLDER_X_LABEL", ChartLabels.xAxisPreFilledQuestions)
+    survey_image_path += question_identifier + ".png"
+    current_chart = current_chart.replace("PLACEHOLDER_SURVEY_IMAGE", survey_image_path)
+    current_chart = current_chart.replace("PLACEHOLDER_CAPTION", question_name)
     current_chart = current_chart.replace("PLACEHOLDER_LABEL", "fig:" + question)
-    x_keys = ",".join(sorted(matched_prediction.keys()))
+    x_keys = ",".join(sorted(matched_prediction.keys(), key=natural_keys))
     current_chart = current_chart.replace("PLACEHOLDER_X_COORDS", x_keys)
-    values = ["(" + str(line) + "," + str(count) + ")" for line, count in matched_prediction.iteritems()]
-    current_chart = current_chart.replace("PLACEHOLDER_VALUES", "\n".join(values))
+
+    values = []
+    for line in sorted(matched_prediction.keys(), key=natural_keys):
+        count = matched_prediction[line]
+        values.append("(" + str(line) + "," + str(count) + ")")
+    current_chart = current_chart.replace("PLACEHOLDER_VALUES", ("\n" + " " * 16).join(values))
     all_charts.append(current_chart)
 
 with open(chart_output_filename, "w") as chart_file:
-    chart_file.write("\n".join(all_charts))
+    chart_file.write("\n\n".join(all_charts))
