@@ -38,7 +38,6 @@ def merge(dict1, dict2):
     return result
 
 
-
 def load_answers(filename, only_typescript_developers):
     result = {}
     user_id = 0
@@ -61,7 +60,7 @@ def load_answers(filename, only_typescript_developers):
     return (result, user_id)  # using the user_id as count
 
 
-def generate_charts(question_names, question_line_match_counts, template_filename, answer_count):
+def generate_charts(question_names, user_selections, algorithm_selections, template_filename, answer_count):
     class ChartLabels:
         xAxisFreeQuestions = "Line Numbers of Locations Requiring Additional Comment"
         xAxisPreFilledQuestions = "Highlighted Locations Requiring Additional Comment"
@@ -73,7 +72,7 @@ def generate_charts(question_names, question_line_match_counts, template_filenam
 
     for question_name in sorted(question_names.iterkeys(), key=natural_keys):
         question_identifier = question_names[question_name]
-        line_match_counts = question_line_match_counts[question_identifier]
+
         current_chart = template
         survey_image_path = "survey_images/"
         if question_identifier.startswith("q"):
@@ -86,14 +85,24 @@ def generate_charts(question_names, question_line_match_counts, template_filenam
         current_chart = current_chart.replace("PLACEHOLDER_SURVEY_IMAGE", survey_image_path)
         current_chart = current_chart.replace("PLACEHOLDER_CAPTION", question_name)
         current_chart = current_chart.replace("PLACEHOLDER_LABEL", "fig:" + question_identifier)
-        x_keys = ",".join(sorted(line_match_counts.keys(), key=natural_keys))
+
+        algorithm_line_selection_counts = algorithm_selections[question_identifier]
+        user_line_selection_counts = user_selections[question_identifier]
+        all_selected_lines = sorted(set(algorithm_line_selection_counts.keys() + user_line_selection_counts.keys()), key=natural_keys)
+        x_keys = ",".join(all_selected_lines)
         current_chart = current_chart.replace("PLACEHOLDER_X_COORDS", x_keys)
         current_chart = current_chart.replace("PLACEHOLDER_Y_MAX", str(answer_count))
-        values = []
-        for line in sorted(line_match_counts.keys(), key=natural_keys):
-            count = line_match_counts[line]
-            values.append("(" + str(line) + "," + str(count) + ")")
-        current_chart = current_chart.replace("PLACEHOLDER_VALUES", ("\n" + " " * 16).join(values))
+        user_values = []
+        algorithm_values = []
+        for line in all_selected_lines:
+            if line in algorithm_line_selection_counts:
+                count = algorithm_line_selection_counts[line]
+                algorithm_values.append("(" + str(line) + "," + str(count) + ")")
+            elif line in user_line_selection_counts:
+                count = len(user_line_selection_counts[line])
+                user_values.append("(" + str(line) + "," + str(count) + ")")
+        current_chart = current_chart.replace("PLACEHOLDER_USER_VALUES", ("\n" + " " * 20).join(user_values))
+        current_chart = current_chart.replace("PLACEHOLDER_ALGORITHM_VALUES", ("\n" + " " * 20).join(algorithm_values))
         result.append(current_chart)
     return result
 
@@ -138,25 +147,25 @@ fuzzy_matched_predictions = {}
 predictions = json.load(open(prediction_filename))
 for question, predicted_lines in predictions.iteritems():
     line_users = answers[question]
-    matched_line_count = {}
-    fuzzy_matched_line_count = {}
+    matched_line_counts = {}
+    fuzzy_matched_line_counts = {}
     for predicted_line in predicted_lines:
-        matched_line_count[predicted_line] = len(line_users.get(predicted_line, []))
-        fuzzy_matched_line_count[predicted_line] = 0
+        matched_line_counts[predicted_line] = len(line_users.get(predicted_line, []))
+        fuzzy_matched_line_counts[predicted_line] = 0
         already_counted_users = set()
         for fuzzy_line in range(int(predicted_line) - 1, int(predicted_line) + 2):
             users_that_selected_line = line_users.get(str(fuzzy_line), [])
             for user in users_that_selected_line:
                 if user in already_counted_users:
                     continue
-                fuzzy_matched_line_count[predicted_line] += 1
+                fuzzy_matched_line_counts[predicted_line] += 1
                 already_counted_users.add(user)
-    matched_predictions[question] = matched_line_count
-    fuzzy_matched_predictions[question] = fuzzy_matched_line_count
+    matched_predictions[question] = matched_line_counts
+    fuzzy_matched_predictions[question] = fuzzy_matched_line_counts
 print "Done."
 
 print "Generating charts based on template '" + path.basename(chart_template_filename) + "'..."
-all_charts = generate_charts(QUESTION_NAMES, matched_predictions, chart_template_filename, submission_count)
+all_charts = generate_charts(QUESTION_NAMES, answers, matched_predictions, chart_template_filename, submission_count)
 with open(chart_output_filename, "w") as chart_file:
     print "Writing generated charts to '" + path.basename(chart_output_filename) + "'..."
     chart_file.write("\n\n".join(all_charts))
