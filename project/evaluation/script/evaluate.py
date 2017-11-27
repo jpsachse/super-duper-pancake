@@ -4,6 +4,8 @@ import re
 from natural_keys import natural_keys
 from itertools import groupby
 from os import path
+from collections import Iterable
+from itertools import chain
 
 
 class QuestionAnswers:
@@ -24,9 +26,22 @@ def no_typescript_no_programming(row):
             row[QuestionColumns.experienceProgramming] == QuestionAnswers.noProgramming)
 
 
+def merge(dict1, dict2):
+    result = {}
+    for k, v in chain(dict1.items(), dict2.items()):
+        list = result.get(k, [])
+        if isinstance(v, Iterable):
+            list += v
+        else:
+            list.append(v)
+        result[k] = list
+    return result
+
+
+
 def load_answers(filename, only_typescript_developers):
     result = {}
-    number_of_counted_answers = 0
+    user_id = 0
     with open(filename) as opened_file:
         reader = csv.reader(opened_file, delimiter=';', quotechar='"')
         questions = {k: v for k, v in vars(QuestionColumns).iteritems() if not k.startswith("__")}
@@ -35,23 +50,15 @@ def load_answers(filename, only_typescript_developers):
         next(reader)  # skip the header
         next(reader)  # skip the first entry, as it's completely empty
         for row in reader:
-            number_of_counted_answers += 1
+            user_id += 1
             if only_typescript_developers and no_typescript_no_programming(row):
                 continue
             for question_id, question_column in questions.iteritems():
-                question_answers = result.get(question_id, [])
-                current_answer = re.sub(r"\s+", "", row[question_column]).split(",")
-                question_answers += current_answer
+                selected_lines = re.sub(r"\s+", "", row[question_column]).split(",")
+                lines_to_user = {line: user_id for line in selected_lines}
+                question_answers = merge(result.get(question_id, {}), lines_to_user)
                 result[question_id] = question_answers
-
-        # group answers by line
-        for question, answer_list in result.iteritems():
-            sorted_answers = sorted([a for a in answer_list])
-            # grouped_answers = [[answer, len(list(group))] for answer, group in groupby(sorted_answers)]
-            # grouped_answers.sort(lambda a, b: b[1] - a[1])
-            grouped_answers = {answer: len(list(group)) for answer, group in groupby(sorted_answers)}
-            result[question] = grouped_answers
-    return (result, number_of_counted_answers)
+    return (result, user_id)  # using the user_id as count
 
 
 def generate_charts(question_names, question_line_match_counts, template_filename, answer_count):
@@ -130,17 +137,22 @@ matched_predictions = {}
 fuzzy_matched_predictions = {}
 predictions = json.load(open(prediction_filename))
 for question, predicted_lines in predictions.iteritems():
-    answer_lines = answers[question]
-    matched_lines = {}
-    fuzzy_matched_lines = {}
+    line_users = answers[question]
+    matched_line_count = {}
+    fuzzy_matched_line_count = {}
     for predicted_line in predicted_lines:
-        matched_lines[predicted_line] = answer_lines.get(predicted_line, 0)
-        fuzzy_matched_lines[predicted_line] = 0
+        matched_line_count[predicted_line] = len(line_users.get(predicted_line, []))
+        fuzzy_matched_line_count[predicted_line] = 0
+        already_counted_users = set()
         for fuzzy_line in range(int(predicted_line) - 1, int(predicted_line) + 2):
-            entry = answer_lines.get(str(fuzzy_line), 0)
-            fuzzy_matched_lines[predicted_line] += entry
-    matched_predictions[question] = matched_lines
-    fuzzy_matched_predictions[question] = fuzzy_matched_lines
+            users_that_selected_line = line_users.get(str(fuzzy_line), [])
+            for user in users_that_selected_line:
+                if user in already_counted_users:
+                    continue
+                fuzzy_matched_line_count[predicted_line] += 1
+                already_counted_users.add(user)
+    matched_predictions[question] = matched_line_count
+    fuzzy_matched_predictions[question] = fuzzy_matched_line_count
 print "Done."
 
 print "Generating charts based on template '" + path.basename(chart_template_filename) + "'..."
