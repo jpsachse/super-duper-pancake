@@ -3,6 +3,7 @@ import json
 import re
 from natural_keys import natural_keys
 from itertools import groupby
+from os import path
 
 
 class QuestionAnswers:
@@ -25,13 +26,16 @@ def no_typescript_no_programming(row):
 
 def load_answers(filename, only_typescript_developers):
     result = {}
+    number_of_counted_answers = 0
     with open(filename) as opened_file:
         reader = csv.reader(opened_file, delimiter=';', quotechar='"')
         questions = {k: v for k, v in vars(QuestionColumns).iteritems() if not k.startswith("__")}
 
         # get all answers as list, accessible by question identifier
         next(reader)  # skip the header
+        next(reader)  # skip the first entry, as it's completely empty
         for row in reader:
+            number_of_counted_answers += 1
             if only_typescript_developers and no_typescript_no_programming(row):
                 continue
             for question_id, question_column in questions.iteritems():
@@ -47,18 +51,18 @@ def load_answers(filename, only_typescript_developers):
             # grouped_answers.sort(lambda a, b: b[1] - a[1])
             grouped_answers = {answer: len(list(group)) for answer, group in groupby(sorted_answers)}
             result[question] = grouped_answers
-    return result
+    return (result, number_of_counted_answers)
 
 
-def generate_charts(question_names, question_line_match_counts, template_filename):
+def generate_charts(question_names, question_line_match_counts, template_filename, answer_count):
     class ChartLabels:
         xAxisFreeQuestions = "Line Numbers of Locations Requiring Additional Comment"
         xAxisPreFilledQuestions = "Highlighted Locations Requiring Additional Comment"
 
     result = []
     template = ""
-    with open(chart_template_filename) as chart_template_file:
-        template = chart_template_file.read()
+    with open(template_filename) as template_file:
+        template = template_file.read()
 
     for question_name in sorted(question_names.iterkeys(), key=natural_keys):
         question_identifier = question_names[question_name]
@@ -77,7 +81,7 @@ def generate_charts(question_names, question_line_match_counts, template_filenam
         current_chart = current_chart.replace("PLACEHOLDER_LABEL", "fig:" + question_identifier)
         x_keys = ",".join(sorted(line_match_counts.keys(), key=natural_keys))
         current_chart = current_chart.replace("PLACEHOLDER_X_COORDS", x_keys)
-
+        current_chart = current_chart.replace("PLACEHOLDER_Y_MAX", str(answer_count))
         values = []
         for line in sorted(line_match_counts.keys(), key=natural_keys):
             count = line_match_counts[line]
@@ -97,8 +101,11 @@ with open("filenames.txt") as filenames_file:
 
 csv_filename, prediction_filename, chart_template_filename, chart_output_filename = filenames
 
-answers = load_answers(csv_filename, False)
+print "Loading answers from '" + path.basename(csv_filename) + "'..."
+answers, submission_count = load_answers(csv_filename, False)
+print "Done."
 
+print "Loading and matching prediction data from '" + path.basename(prediction_filename) + "'..."
 matched_predictions = {}
 predictions = json.load(open(prediction_filename))
 for question, predicted_lines in predictions.iteritems():
@@ -107,7 +114,34 @@ for question, predicted_lines in predictions.iteritems():
     for predicted_line in predicted_lines:
         matched_lines[predicted_line] = answer_lines.get(predicted_line, 0)
     matched_predictions[question] = matched_lines
+print "Done."
 
-all_charts = generate_charts(QUESTION_NAMES, matched_predictions, chart_template_filename)
+print "Generating charts based on template '" + path.basename(chart_template_filename) + "'..."
+all_charts = generate_charts(QUESTION_NAMES, matched_predictions, chart_template_filename, submission_count)
 with open(chart_output_filename, "w") as chart_file:
+    print "Writing generated charts to '" + path.basename(chart_output_filename) + "'..."
     chart_file.write("\n\n".join(all_charts))
+print "Done."
+
+
+print "Calculating average agreement..."
+avg_agreement = 0
+avg_agreement_without_first = 0
+all_count = 0
+without_first_count = 0
+for question, matched_lines in matched_predictions.iteritems():
+    is_first = True
+    for line in sorted(matched_lines.keys(), key=natural_keys):
+        avg_agreement += matched_lines[line] / float(submission_count)
+        all_count += 1
+        if is_first:
+            is_first = False
+            continue
+        avg_agreement_without_first += matched_lines[line] / float(submission_count)
+        without_first_count += 1
+avg_agreement = avg_agreement / float(all_count)
+avg_agreement_without_header = avg_agreement_without_first / float(without_first_count)
+print "Done."
+
+print "Average agreement: " + str(avg_agreement)
+print "Average agreement (skipping first): " + str(avg_agreement_without_header)
