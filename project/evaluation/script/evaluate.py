@@ -2,7 +2,6 @@ import csv
 import json
 import re
 from natural_keys import natural_keys
-from itertools import groupby
 from os import path
 from collections import Iterable
 from itertools import chain
@@ -60,7 +59,8 @@ def load_answers(filename, only_typescript_developers):
     return (result, user_id)  # using the user_id as count
 
 
-def generate_charts(question_names, user_selections, algorithm_selections, template_filename, answer_count):
+def generate_charts(question_names, user_selections, algorithm_selections,
+                    template_filename, answer_count, algorithm_selection_to_line):
     class ChartLabels:
         xAxisFreeQuestions = "Line Numbers of Locations Requiring Additional Comment"
         xAxisPreFilledQuestions = "Highlighted Locations Requiring Additional Comment"
@@ -88,9 +88,28 @@ def generate_charts(question_names, user_selections, algorithm_selections, templ
 
         algorithm_line_selection_counts = algorithm_selections[question_identifier]
         user_line_selection_counts = user_selections[question_identifier]
+        # "markedX" and "markedXa" questions are a pair. Use the "markedXa" answers as "user_line"s, as those are the
+        # lines that participants wanted additional comments on.
+        # Replace the "no lines" (empty) one with the one from the "markedX" one though, as this one then means
+        # "I don't want any comments here", which is what it means in all "q" cases as well
+        if question_identifier.startswith("m"):
+            line_map = algorithm_selection_to_line[question_identifier]
+            updated_map = {}
+            for selection_number, line_number in line_map.iteritems():
+                updated_map[line_number] = algorithm_line_selection_counts[selection_number]
+            algorithm_line_selection_counts = updated_map
+            user_line_selection_counts = user_selections[question_identifier + "a"]
+            if "" in user_line_selection_counts:
+                user_line_selection_counts.pop("")
+            if "" in user_selections[question_identifier]:
+                user_line_selection_counts[""] = user_selections[question_identifier].get("")
+
         all_selected_lines = sorted(set(algorithm_line_selection_counts.keys() + user_line_selection_counts.keys()), key=natural_keys)
-        x_keys = ",".join(all_selected_lines)
-        current_chart = current_chart.replace("PLACEHOLDER_X_COORDS", x_keys)
+        x_keys = list(all_selected_lines)
+        if "" in x_keys:
+            x_keys.remove("")
+            x_keys.append("X")
+        current_chart = current_chart.replace("PLACEHOLDER_X_COORDS", ",".join(x_keys))
         current_chart = current_chart.replace("PLACEHOLDER_Y_MAX", str(answer_count))
         user_values = []
         algorithm_values = []
@@ -100,6 +119,8 @@ def generate_charts(question_names, user_selections, algorithm_selections, templ
                 algorithm_values.append("(" + str(line) + "," + str(count) + ")")
             elif line in user_line_selection_counts:
                 count = len(user_line_selection_counts[line])
+                if line == "":
+                    line = "X"
                 user_values.append("(" + str(line) + "," + str(count) + ")")
         current_chart = current_chart.replace("PLACEHOLDER_USER_VALUES", ("\n" + " " * 20).join(user_values))
         current_chart = current_chart.replace("PLACEHOLDER_ALGORITHM_VALUES", ("\n" + " " * 20).join(algorithm_values))
@@ -135,8 +156,9 @@ filenames = []
 with open("filenames.txt") as filenames_file:
     filenames = filenames_file.read().split("\n")
 
-csv_filename, prediction_filename, chart_template_filename, chart_output_filename = filenames
+csv_filename, prediction_filename, chart_template_filename, chart_output_filename, selection_lines_filename = filenames
 
+algorithm_selection_to_line = json.load(open(selection_lines_filename))
 print "Loading answers from '" + path.basename(csv_filename) + "'..."
 answers, submission_count = load_answers(csv_filename, False)
 print "Done."
@@ -165,7 +187,8 @@ for question, predicted_lines in predictions.iteritems():
 print "Done."
 
 print "Generating charts based on template '" + path.basename(chart_template_filename) + "'..."
-all_charts = generate_charts(QUESTION_NAMES, answers, matched_predictions, chart_template_filename, submission_count)
+all_charts = generate_charts(QUESTION_NAMES, answers, matched_predictions,
+                             chart_template_filename, submission_count, algorithm_selection_to_line)
 with open(chart_output_filename, "w") as chart_file:
     print "Writing generated charts to '" + path.basename(chart_output_filename) + "'..."
     chart_file.write("\n\n".join(all_charts))
