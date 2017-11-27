@@ -91,6 +91,26 @@ def generate_charts(question_names, question_line_match_counts, template_filenam
     return result
 
 
+def calculate_agreement(matched_answers, total_submission_count):
+    avg_agreement = 0
+    avg_agreement_without_first = 0
+    all_count = 0
+    without_first_count = 0
+    for question, matched_lines in matched_answers.iteritems():
+        is_first = True
+        for line in sorted(matched_lines.keys(), key=natural_keys):
+            avg_agreement += matched_lines[line] / float(total_submission_count)
+            all_count += 1
+            if is_first:
+                is_first = False
+                continue
+            avg_agreement_without_first += matched_lines[line] / float(total_submission_count)
+            without_first_count += 1
+    avg_agreement = avg_agreement / float(all_count)
+    avg_agreement_without_header = avg_agreement_without_first / float(without_first_count)
+    return (avg_agreement, avg_agreement_without_header)
+
+
 # mapping from question name to identifier, e.g., "Question 11" => "marked1"
 QUESTION_NAMES = {"Question " + str(x): "q" + str(x) for x in range(1, 11)}
 QUESTION_NAMES.update({"Question " + str(x + 10): "marked" + str(x) for x in range(1, 11)})
@@ -107,13 +127,20 @@ print "Done."
 
 print "Loading and matching prediction data from '" + path.basename(prediction_filename) + "'..."
 matched_predictions = {}
+fuzzy_matched_predictions = {}
 predictions = json.load(open(prediction_filename))
 for question, predicted_lines in predictions.iteritems():
     answer_lines = answers[question]
     matched_lines = {}
+    fuzzy_matched_lines = {}
     for predicted_line in predicted_lines:
         matched_lines[predicted_line] = answer_lines.get(predicted_line, 0)
+        fuzzy_matched_lines[predicted_line] = 0
+        for fuzzy_line in range(int(predicted_line) - 1, int(predicted_line) + 2):
+            entry = answer_lines.get(str(fuzzy_line), 0)
+            fuzzy_matched_lines[predicted_line] += entry
     matched_predictions[question] = matched_lines
+    fuzzy_matched_predictions[question] = fuzzy_matched_lines
 print "Done."
 
 print "Generating charts based on template '" + path.basename(chart_template_filename) + "'..."
@@ -125,23 +152,12 @@ print "Done."
 
 
 print "Calculating average agreement..."
-avg_agreement = 0
-avg_agreement_without_first = 0
-all_count = 0
-without_first_count = 0
-for question, matched_lines in matched_predictions.iteritems():
-    is_first = True
-    for line in sorted(matched_lines.keys(), key=natural_keys):
-        avg_agreement += matched_lines[line] / float(submission_count)
-        all_count += 1
-        if is_first:
-            is_first = False
-            continue
-        avg_agreement_without_first += matched_lines[line] / float(submission_count)
-        without_first_count += 1
-avg_agreement = avg_agreement / float(all_count)
-avg_agreement_without_header = avg_agreement_without_first / float(without_first_count)
+avg_agreement, avg_agreement_without_header = calculate_agreement(matched_predictions, submission_count)
+fuzzy_avg_agreement, fuzzy_avg_agreement_without_header = calculate_agreement(fuzzy_matched_predictions, submission_count)
 print "Done."
 
 print "Average agreement: " + str(avg_agreement)
 print "Average agreement (skipping first): " + str(avg_agreement_without_header)
+
+print "Average agreement (fuzzy): " + str(fuzzy_avg_agreement)
+print "Average agreement (fuzzy, skipping first): " + str(fuzzy_avg_agreement_without_header)
