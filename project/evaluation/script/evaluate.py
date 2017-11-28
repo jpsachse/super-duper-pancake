@@ -61,10 +61,6 @@ def load_answers(filename, only_typescript_developers):
 
 def generate_charts(question_names, user_selections, algorithm_selections,
                     template_filename, answer_count, algorithm_selection_to_line):
-    class ChartLabels:
-        xAxisFreeQuestions = "Line Numbers of Locations Requiring Additional Comment"
-        xAxisPreFilledQuestions = "Highlighted Locations Requiring Additional Comment"
-
     result = []
     template = ""
     with open(template_filename) as template_file:
@@ -77,10 +73,8 @@ def generate_charts(question_names, user_selections, algorithm_selections,
         survey_image_path = "survey_images/"
         if question_identifier.startswith("q"):
             survey_image_path += "01_unmarked/"
-            current_chart = current_chart.replace("PLACEHOLDER_X_LABEL", ChartLabels.xAxisFreeQuestions)
         else:
             survey_image_path += "02_marked/"
-            current_chart = current_chart.replace("PLACEHOLDER_X_LABEL", ChartLabels.xAxisPreFilledQuestions)
         survey_image_path += question_identifier + ".png"
         current_chart = current_chart.replace("PLACEHOLDER_SURVEY_IMAGE", survey_image_path)
         current_chart = current_chart.replace("PLACEHOLDER_CAPTION", question_name)
@@ -109,6 +103,9 @@ def generate_charts(question_names, user_selections, algorithm_selections,
         if "" in x_keys:
             x_keys.remove("")
             x_keys.append("X")
+            current_chart = current_chart.replace("PLACEHOLDER_X_LABEL", " (X: no comment required)")
+        else:
+            current_chart = current_chart.replace("PLACEHOLDER_X_LABEL", "")
         current_chart = current_chart.replace("PLACEHOLDER_X_COORDS", ",".join(x_keys))
         current_chart = current_chart.replace("PLACEHOLDER_Y_MAX", str(answer_count))
         user_values = []
