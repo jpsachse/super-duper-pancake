@@ -150,63 +150,82 @@ def calculate_agreement(matched_answers, total_submission_count):
     return (avg_agreement, avg_agreement_without_first)
 
 
-# mapping from question name to identifier, e.g., "Question 11" => "marked1"
-QUESTION_NAMES = {"Question " + str(x): "q" + str(x) for x in range(1, 11)}
-QUESTION_NAMES.update({"Question " + str(x + 10): "marked" + str(x) for x in range(1, 11)})
-# QUESTION_NAMES = {"Question " + str(x + 10): "marked" + str(x) for x in range(1, 11)}
+def matches_next_item_fuzzily(current_item, items):
+    if current_item not in items:
+        return False
+    current_index = items.index(current_item)
+    if current_index >= len(items) - 1:
+        return False
+    next_item = items[current_index + 1]
+    return int(next_item) - int(current_item) <= 2
 
-filenames = []
-with open("filenames.txt") as filenames_file:
-    filenames = filenames_file.read().split("\n")
 
-csv_filename, prediction_filename, chart_template_filename, chart_output_filename, selection_lines_filename = filenames
-
-algorithm_selection_to_line = json.load(open(selection_lines_filename))
-print "Loading answers from '" + path.basename(csv_filename) + "'..."
-answers, submission_count = load_answers(csv_filename, False)
-print "Done."
-
-print "Loading and matching prediction data from '" + path.basename(prediction_filename) + "'..."
-matched_predictions = {}
-fuzzy_matched_predictions = {}
-predictions = json.load(open(prediction_filename))
-for question, predicted_lines in predictions.iteritems():
-    line_users = answers.get(question)
-    if not line_users:
-        continue
-    matched_line_counts = {}
-    fuzzy_matched_line_counts = {}
-    for predicted_line in predicted_lines:
-        matched_line_counts[predicted_line] = len(line_users.get(predicted_line, []))
-        fuzzy_matched_line_counts[predicted_line] = 0
-        already_counted_users = set()
-        for fuzzy_line in range(int(predicted_line) - 1, int(predicted_line) + 2):
-            users_that_selected_line = line_users.get(str(fuzzy_line), [])
-            for user in users_that_selected_line:
-                if user in already_counted_users:
+def match_predicitons(algorithm_predicitons, user_answers):
+    matches = {}
+    fuzzy_matches= {}
+    for question, predicted_lines in algorithm_predicitons.iteritems():
+        line_users = user_answers.get(question)
+        if not line_users:
+            continue
+        matched_line_counts = {}
+        fuzzy_matched_line_counts = {}
+        for predicted_line in predicted_lines:
+            matched_line_counts[predicted_line] = len(line_users.get(predicted_line, []))
+            fuzzy_matched_line_counts[predicted_line] = 0
+            already_counted_users = set()
+            for fuzzy_line in range(int(predicted_line) - 1, int(predicted_line) + 2):
+                if fuzzy_line > int(predicted_line) and matches_next_item_fuzzily(predicted_line, predicted_lines):
                     continue
-                fuzzy_matched_line_counts[predicted_line] += 1
-                already_counted_users.add(user)
-    matched_predictions[question] = matched_line_counts
-    fuzzy_matched_predictions[question] = fuzzy_matched_line_counts
-print "Done."
-
-print "Generating charts based on template '" + path.basename(chart_template_filename) + "'..."
-all_charts = generate_charts(QUESTION_NAMES, answers, matched_predictions,
-                             chart_template_filename, submission_count, algorithm_selection_to_line)
-with open(chart_output_filename, "w") as chart_file:
-    print "Writing generated charts to '" + path.basename(chart_output_filename) + "'..."
-    chart_file.write("\n\n".join(all_charts))
-print "Done."
+                users_that_selected_line = line_users.get(str(fuzzy_line), [])
+                for user in users_that_selected_line:
+                    if user in already_counted_users:
+                        continue
+                    fuzzy_matched_line_counts[predicted_line] += 1
+                    already_counted_users.add(user)
+        matches[question] = matched_line_counts
+        fuzzy_matches[question] = fuzzy_matched_line_counts
+    return matches, fuzzy_matches
 
 
-print "Calculating average agreement..."
-avg_agreement, avg_agreement_without_header = calculate_agreement(matched_predictions, submission_count)
-fuzzy_avg_agreement, fuzzy_avg_agreement_without_header = calculate_agreement(fuzzy_matched_predictions, submission_count)
-print "Done."
+if __name__ == "__main__":
+    # mapping from question name to identifier, e.g., "Question 11" => "marked1"
+    QUESTION_NAMES = {"Question " + str(x): "q" + str(x) for x in range(1, 11)}
+    QUESTION_NAMES.update({"Question " + str(x + 10): "marked" + str(x) for x in range(1, 11)})
+    # QUESTION_NAMES = {"Question " + str(x + 10): "marked" + str(x) for x in range(1, 11)}
+    TYPESCRIPT_DEVS_ONLY = True
 
-print "Average agreement: " + str(avg_agreement)
-print "Average agreement (skipping first): " + str(avg_agreement_without_header)
+    filenames = []
+    with open("filenames.txt") as filenames_file:
+        filenames = filenames_file.read().split("\n")
 
-print "Average agreement (fuzzy): " + str(fuzzy_avg_agreement)
-print "Average agreement (fuzzy, skipping first): " + str(fuzzy_avg_agreement_without_header)
+    csv_filename, prediction_filename, chart_template_filename, chart_output_filename, selection_lines_filename = filenames
+
+    algorithm_selection_to_line = json.load(open(selection_lines_filename))
+    print "Loading answers from '" + path.basename(csv_filename) + "'..."
+    answers, submission_count = load_answers(csv_filename, TYPESCRIPT_DEVS_ONLY)
+    print "Done."
+
+    print "Loading and matching prediction data from '" + path.basename(prediction_filename) + "'..."
+    predictions = json.load(open(prediction_filename))
+    matched_predictions, fuzzy_matched_predictions = match_predicitons(predictions, answers)
+
+    print "Done."
+
+    print "Generating charts based on template '" + path.basename(chart_template_filename) + "'..."
+    all_charts = generate_charts(QUESTION_NAMES, answers, matched_predictions,
+                                 chart_template_filename, submission_count, algorithm_selection_to_line)
+    with open(chart_output_filename, "w") as chart_file:
+        print "Writing generated charts to '" + path.basename(chart_output_filename) + "'..."
+        chart_file.write("\n\n".join(all_charts))
+    print "Done."
+
+    print "Calculating average agreement..."
+    avg_agreement, avg_agreement_without_header = calculate_agreement(matched_predictions, submission_count)
+    fuzzy_avg_agreement, fuzzy_avg_agreement_without_header = calculate_agreement(fuzzy_matched_predictions, submission_count)
+    print "Done."
+
+    print "Average agreement: " + str(avg_agreement)
+    print "Average agreement (skipping first): " + str(avg_agreement_without_header)
+
+    print "Average agreement (fuzzy): " + str(fuzzy_avg_agreement)
+    print "Average agreement (fuzzy, skipping first): " + str(fuzzy_avg_agreement_without_header)
