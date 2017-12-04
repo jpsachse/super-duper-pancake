@@ -8,8 +8,11 @@ from itertools import chain
 
 
 class QuestionAnswers:
-    noTypeScript = 'I have never written or read TypeScript before'
-    noProgramming = 'I have never written a software program before'
+    noTypeScript = "I have never written or read TypeScript before"
+    noProgramming = "I have never written a software program before"
+    beginner = "Beginner"
+    advanced = "Advanced"
+    proficient = "Proficient"
 
 
 class QuestionColumns:
@@ -48,9 +51,9 @@ def load_answers(filename, only_typescript_developers):
         next(reader)  # skip the header
         next(reader)  # skip the first entry, as it's completely empty
         for row in reader:
-            user_id += 1
             if only_typescript_developers and no_typescript_no_programming(row):
                 continue
+            user_id += 1
             for question_id, question_column in questions.iteritems():
                 selected_lines = re.sub(r"\s+", "", row[question_column]).split(",")
                 lines_to_user = {line: user_id for line in selected_lines}
@@ -103,7 +106,7 @@ def generate_charts(question_names, user_selections, algorithm_selections,
         if "" in x_keys:
             x_keys.remove("")
             x_keys.append("X")
-            current_chart = current_chart.replace("PLACEHOLDER_X_LABEL", " (X: no comment required)")
+            current_chart = current_chart.replace("PLACEHOLDER_X_LABEL", "(X: no comment required)")
         else:
             current_chart = current_chart.replace("PLACEHOLDER_X_LABEL", "")
         current_chart = current_chart.replace("PLACEHOLDER_X_COORDS", ",".join(x_keys))
@@ -140,14 +143,17 @@ def calculate_agreement(matched_answers, total_submission_count):
                 continue
             avg_agreement_without_first += matched_lines[line] / float(total_submission_count)
             without_first_count += 1
-    avg_agreement = avg_agreement / float(all_count)
-    avg_agreement_without_header = avg_agreement_without_first / float(without_first_count)
-    return (avg_agreement, avg_agreement_without_header)
+    if all_count > 0:
+        avg_agreement = avg_agreement / float(all_count)
+    if without_first_count > 0:
+        avg_agreement_without_first = avg_agreement_without_first / float(without_first_count)
+    return (avg_agreement, avg_agreement_without_first)
 
 
 # mapping from question name to identifier, e.g., "Question 11" => "marked1"
 QUESTION_NAMES = {"Question " + str(x): "q" + str(x) for x in range(1, 11)}
 QUESTION_NAMES.update({"Question " + str(x + 10): "marked" + str(x) for x in range(1, 11)})
+# QUESTION_NAMES = {"Question " + str(x + 10): "marked" + str(x) for x in range(1, 11)}
 
 filenames = []
 with open("filenames.txt") as filenames_file:
@@ -165,7 +171,9 @@ matched_predictions = {}
 fuzzy_matched_predictions = {}
 predictions = json.load(open(prediction_filename))
 for question, predicted_lines in predictions.iteritems():
-    line_users = answers[question]
+    line_users = answers.get(question)
+    if not line_users:
+        continue
     matched_line_counts = {}
     fuzzy_matched_line_counts = {}
     for predicted_line in predicted_lines:
