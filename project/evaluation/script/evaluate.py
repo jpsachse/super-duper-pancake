@@ -192,7 +192,7 @@ if __name__ == "__main__":
     QUESTION_NAMES = {"Question " + str(x): "q" + str(x) for x in range(1, 11)}
     QUESTION_NAMES.update({"Question " + str(x + 10): "marked" + str(x) for x in range(1, 11)})
     # QUESTION_NAMES = {"Question " + str(x + 10): "marked" + str(x) for x in range(1, 11)}
-    TYPESCRIPT_DEVS_ONLY = True
+    TYPESCRIPT_DEVS_ONLY = False
 
     filenames = []
     with open("filenames.txt") as filenames_file:
