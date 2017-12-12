@@ -2,12 +2,12 @@ import { expect } from "chai";
 import { readFileSync } from "fs";
 import "mocha";
 import * as ts from "typescript";
-import { HighCommentQualityWalkerV2 } from "../highCommentQualityWalkerV2";
+import { HighCommentQualityWalker } from "../highCommentQualityWalker";
 import { CyclomaticComplexityCollector, LinesOfCodeCollector } from "../metricCollectors";
 import { CommentClass } from "../sourceComment";
 import { TsCompilerBasedCodeDetector } from "../tsCompilerBasedCodeDetector";
 
-function createWalker(fileName: string): HighCommentQualityWalkerV2<Set<object>> {
+function createWalker(fileName: string): HighCommentQualityWalker<Set<object>> {
     const sourceFile = ts.createSourceFile(fileName,
         readFileSync(fileName).toString(),
         ts.ScriptTarget.Latest,
@@ -15,7 +15,7 @@ function createWalker(fileName: string): HighCommentQualityWalkerV2<Set<object>>
     const locCollector = new LinesOfCodeCollector();
     const ccCollector = new CyclomaticComplexityCollector();
     const codeDetector = new TsCompilerBasedCodeDetector();
-    const walker = new HighCommentQualityWalkerV2(
+    const walker = new HighCommentQualityWalker(
         sourceFile, "high-comment-quality", new Set(),
         locCollector, ccCollector, codeDetector);
     walker.walk(sourceFile);

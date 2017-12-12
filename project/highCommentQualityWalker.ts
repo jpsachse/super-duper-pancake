@@ -28,7 +28,7 @@ interface IAnalysisResult {
     expressionNestingDepth: number;
 }
 
-export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
+export class HighCommentQualityWalker<T> extends Lint.AbstractWalker<T> {
 
     public static sectionComplexityThreshold = 10;
     public static nodeTotalComplexityThreshold = 20;
@@ -463,19 +463,19 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
             }
             if (sectionComplexity > 0) {
                 this.enforceCommentRequirementForSection(sectionComplexity,
-                                                         HighCommentQualityWalkerV2.sectionComplexityThreshold,
+                                                         HighCommentQualityWalker.sectionComplexityThreshold,
                                                          section,
                                                          lineComplexities,
-                                                         HighCommentQualityWalkerV2.lineComplexityThreshold);
+                                                         HighCommentQualityWalker.lineComplexityThreshold);
                 sectionComplexities.add({line: section.low, complexity: sectionComplexity});
             }
         });
-        if (totalComplexity > HighCommentQualityWalkerV2.nodeTotalComplexityThreshold) {
+        if (totalComplexity > HighCommentQualityWalker.nodeTotalComplexityThreshold) {
             this.enforceCommentRequirementForSection(totalComplexity,
-                                                     HighCommentQualityWalkerV2.nodeTotalComplexityThreshold,
+                                                     HighCommentQualityWalker.nodeTotalComplexityThreshold,
                                                      sections[sections.length - 1],
                                                      sectionComplexities,
-                                                     HighCommentQualityWalkerV2.sectionComplexityThreshold);
+                                                     HighCommentQualityWalker.sectionComplexityThreshold);
         }
     }
 
