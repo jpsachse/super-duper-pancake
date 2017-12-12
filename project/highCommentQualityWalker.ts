@@ -53,6 +53,12 @@ export class HighCommentQualityWalker<T> extends Lint.AbstractWalker<T> {
         this.commentClassifier = new CommentClassifier(codeDetector, this.sourceMap);
     }
 
+    /**
+     * Walk a source file and determine locations that require additional comment
+     * and existing comments that may be unhelpful.
+     * @param sourceFile The sourceFile to be walked.
+     * Has to match the one that has been used for initialization.
+     */
     public walk(sourceFile: ts.SourceFile) {
         if (sourceFile !== this.sourceFile) {
             throw new Error("Source file not equal to the one used for construction!");
@@ -60,16 +66,25 @@ export class HighCommentQualityWalker<T> extends Lint.AbstractWalker<T> {
         this.findSections();
         this.classifyComments();
 
+        // Compute complexity of code in functions and add requirements for too complex sections.
         this.sourceMap.getAllFunctionLikes().forEach((node) => {
             if (!this.nodeComplexities.has(node)) {
                 this.analyze(node);
                 this.addCommentRequirements(node);
             }
         });
+        // Add rule failures for all comment requirements that are not already matched by a high
+        // quality comment or are consecutive.
         this.addFailuresForCommentRequirements();
     }
 
+    /**
+     * Classifies all SourceComment objects found in the SourceMap and
+     * evaluates their quality based on the classification
+     */
     private classifyComments() {
+        // Sort two sections so that the smallest one that started nearest to the comment comes first.
+        // If both start at the same position, sort the bigger one first.
         const closestToComment = (a: Interval, b: Interval): number => {
             const bigger = b.low - a.low;
             if (bigger !== 0) {
@@ -78,6 +93,7 @@ export class HighCommentQualityWalker<T> extends Lint.AbstractWalker<T> {
             return (b.high - b.low) - (a.high - a.low);
         };
 
+        // Classify all SourceComment objects and evaluate their quality based on classification
         this.sourceMap.getAllComments().forEach((comment) => {
             const commentEndLine = this.sourceFile.getLineAndCharacterOfPosition(comment.end).line;
             let possibleSections = this.sections.search(commentEndLine + 1, commentEndLine + 1);
@@ -89,11 +105,20 @@ export class HighCommentQualityWalker<T> extends Lint.AbstractWalker<T> {
                                                                                   this.sourceMap,
                                                                                   sectionEndLine);
             this.commentStats.set(comment, {classifications, qualityEvaluation: evaluationResult});
-            classifications.forEach( (classification, index) => {
-                if (classification.commentClass === CommentClass.Code) {
-                    this.addFailureForClassification(comment, classification);
-                }
-            });
+
+            // Add failures for code comments. Pure Annotation comments are not taken into account,
+            // as sth. like "tslint:disable:no-string-literal" would qualify as code and thus get highlighted
+            const isAnnotation = classifications.find( (c) => c.commentClass === CommentClass.Annotation && !c.lines);
+            if (!isAnnotation) {
+                classifications.forEach( (classification, index) => {
+                    if (classification.commentClass === CommentClass.Code) {
+                        this.addFailureForClassification(comment, classification);
+                    }
+                });
+            }
+
+            // Add a failure to the first line of the comment if the quality is low,
+            // including all reasons
             if (evaluationResult.quality <= CommentQuality.Low && evaluationResult.quality !== CommentQuality.Unknown) {
                 const end = this.sourceFile.getLineEndOfPosition(comment.pos);
                 const reasoning = evaluationResult.reasons.join("\n");
@@ -122,6 +147,8 @@ export class HighCommentQualityWalker<T> extends Lint.AbstractWalker<T> {
         const sanitizedComment = comment.getSanitizedCommentText();
         const jsDocs = sanitizedComment.jsDoc;
         let currentIndex = 0;
+
+        // Filter code from JSDoc comments
         jsDocs.forEach((jsDoc: ts.JSDoc) => {
             while (currentIndex < unacceptableLines.length) {
                 const codeLine = commentLines[unacceptableLines[currentIndex]];
@@ -177,6 +204,8 @@ export class HighCommentQualityWalker<T> extends Lint.AbstractWalker<T> {
                 }
             });
         });
+
+        // Filter code from normal comments
         if (jsDocs.length === 0) {
             currentIndex = 0;
             const commentText = sanitizedComment.text;
@@ -221,6 +250,10 @@ export class HighCommentQualityWalker<T> extends Lint.AbstractWalker<T> {
         return false;
     }
 
+    /**
+     * Analyze a node and compute its complexity.
+     * @param node The node to be analyzed
+     */
     private analyze(node?: ts.Node): IAnalysisResult {
         if (!node) { return {complexity: 0, expressionNestingDepth: 0}; }
         let complexity = 0;
@@ -254,18 +287,23 @@ export class HighCommentQualityWalker<T> extends Lint.AbstractWalker<T> {
         } else {
             maxChildExpressionNestingDepth = 0;
         }
-        // if (Utils.isDeclaration(node) || Utils.isStatement(node) || ts.isFunctionLike(node)) {
         this.nodeComplexities.set(node, complexity);
-        // }
         return {complexity, expressionNestingDepth: maxChildExpressionNestingDepth};
     }
 
+    /**
+     * Convenience method to get the number of lines of code for a node.
+     * Contains special handling for if-Statements with else branches.
+     * @param node The node the loc metric is requested for
+     */
     private getLocForNode(node: ts.Node): number {
         if (ts.isIfStatement(node.parent)) {
             let locComplexity: number;
             if (node.parent.thenStatement === node) {
+                // Block of the then branch => if is parent
                 locComplexity = this.locCollector.getLoc(node.parent);
             } else {
+                // Block of the else branch
                 const elseKeyword = node.parent.getChildren().find((child) => {
                     return child.kind === ts.SyntaxKind.ElseKeyword;
                 });
@@ -280,6 +318,11 @@ export class HighCommentQualityWalker<T> extends Lint.AbstractWalker<T> {
         return 1;
     }
 
+    /**
+     * Special handling for IterationStatement analysis.
+     * Includes computation for the corresponding conditional statements and the executed blocks.
+     * @param node The node of type iteration statement to be analyzed
+     */
     private analyzeIterationStatement(node: ts.IterationStatement): number {
         const statementComplexity = this.analyze(node.statement).complexity;
         let conditionComplexity = 0;
@@ -298,6 +341,11 @@ export class HighCommentQualityWalker<T> extends Lint.AbstractWalker<T> {
         return totalComplexity;
     }
 
+    /**
+     * Special handling for IfStatement analysis.
+     * Includes computation for the corresponding conditional statement and the executed blocks.
+     * @param node The node of type if statement to be analyzed
+     */
     private analyzeIfStatement(node: ts.IfStatement): number {
         const thenComplexity = this.analyze(node.thenStatement).complexity;
         const elseComplexity = this.analyze(node.elseStatement).complexity;
@@ -313,13 +361,20 @@ export class HighCommentQualityWalker<T> extends Lint.AbstractWalker<T> {
         return ifComplexity;
     }
 
+    /**
+     * Adds rule failures for code classifications from the start to the end of the classification match.
+     * @param comment The comment which classifications may result in failures.
+     * @param classification The classifications for the comment.
+     */
     private addFailureForClassification(comment: SourceComment, classification: ICommentClassification) {
         const failureMessage = this.getFailureMessage(classification.commentClass);
         if (classification.lines === undefined) {
+            // The complete comment is code.
             const pos = comment.pos;
             const end = comment.end;
             this.addFailure(pos, end, failureMessage);
         } else {
+            // Only select lines are code. Highlight those lines
             const lines = this.getUnescapedCodeLines(classification, comment);
             lines.forEach( (lineNumber) => {
                 this.addFailure(comment.getPosOfLine(lineNumber),
@@ -357,9 +412,16 @@ export class HighCommentQualityWalker<T> extends Lint.AbstractWalker<T> {
         return this.nestingLevelCollector.getNestingLevel(node);
     }
 
+    /**
+     * Recursively divide the code of the SourceFile into sections,
+     * respecting nesting level and layout with whitespace and comments.
+     */
     private findSections() {
         const functions = this.sourceMap.getAllFunctionLikes();
+        // Only consider code inside of functions
         functions.forEach( (functionLike) => {
+            // Skip, if the function has already been divided into sections.
+            // Possible for function definitions in functions.
             const functionStartLine = this.sourceFile.getLineAndCharacterOfPosition(functionLike.getStart()).line;
             const functionEndLine =  this.sourceFile.getLineAndCharacterOfPosition(functionLike.end).line;
             const eligibleSections = this.sections.search(functionStartLine, functionStartLine);
@@ -368,6 +430,8 @@ export class HighCommentQualityWalker<T> extends Lint.AbstractWalker<T> {
                     eligibleSections[0].high >= functionEndLine) {
                 return;
             }
+            // Actual recursive call, trying to find sections from the start line up until
+            // functionEndLine is reached or the nesting level decreases.
             const findSectionInSection = (startLine: number, nestingLevel: number): number => {
                 let previousLineWasCommentOnly = false;
                 let currentSectionStartLine = startLine;
@@ -395,7 +459,6 @@ export class HighCommentQualityWalker<T> extends Lint.AbstractWalker<T> {
                         currentNestingLevel = Math.min(nestingLevel, nextNestingLevel);
                     }
                     if (currentSectionStartLine === -1) {
-                        // TODO: get the correct starting line, as this might be one (or several) lines too far
                         currentSectionStartLine = currentLine;
                     }
 
@@ -427,7 +490,9 @@ export class HighCommentQualityWalker<T> extends Lint.AbstractWalker<T> {
     }
 
     /**
-     * Adds comment requirements based on the given node.
+     * Aggregates complexity values for sections inside the given node and adds comment requirements
+     * if the aggregated value exceeds the threshold.
+     * @param node The node to be analyzed.
      */
     private addCommentRequirements(node: ts.FunctionLikeDeclaration) {
         const startLine = this.sourceMap.sourceFile.getLineAndCharacterOfPosition(node.getStart()).line;
@@ -437,6 +502,8 @@ export class HighCommentQualityWalker<T> extends Lint.AbstractWalker<T> {
             return a.complexity - b.complexity;
         };
         const sectionComplexities = new PriorityQueue<ILineComplexity>(sortDescending);
+        // Sort sections so that the smallest ones come first.
+        // If two are equal sized, sort ascending by location.
         const smallestFirstByAscLocation = (a: Interval, b: Interval) => {
             const sizeA = a.high - a.low;
             const sizeB = b.high - b.low;
