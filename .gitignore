@@ -6,3 +6,4 @@ project/.nyc_output
 project/coverage
 filenames.txt
 project/evaluation/script/.idea
+*.pyc
