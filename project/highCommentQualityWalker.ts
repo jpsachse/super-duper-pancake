@@ -7,8 +7,7 @@ import { CodeDetector } from "./codeDetector";
 import { ICommentClassification } from "./commentClassificationTypes";
 import { CommentClassifier } from "./commentClassifier";
 import { CommentQuality, CommentQualityEvaluator, EvaluationResult } from "./commentQualityEvaluator";
-// tslint:disable-next-line:max-line-length
-import { CyclomaticComplexityCollector, HalsteadCollector, LinesOfCodeCollector, NestingLevelCollector } from "./metricCollectors";
+import { CyclomaticComplexityCollector, LinesOfCodeCollector, NestingLevelCollector } from "./metricCollectors";
 import { CommentClass, SourceComment } from "./sourceComment";
 import { SourceMap } from "./sourceMap";
 import Utils from "./utils";
