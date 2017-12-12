@@ -23,7 +23,7 @@ export class TsCompilerBasedCodeDetector extends CodeDetector {
         }
         const codeLines: number[] = [];
         jsDocs.forEach((jsDoc) => {
-            let textLines = jsDoc.comment.split("\n");
+            let textLines = jsDoc.comment ? jsDoc.comment.split("\n") : [];
             // increase line index by 1, as the text of JSDoc comments generally starts in the second line
             codeLines.push(...this.classifyLinesOfText(textLines).map((line) => line + 1));
             let lineOffset = textLines.length + 1;
