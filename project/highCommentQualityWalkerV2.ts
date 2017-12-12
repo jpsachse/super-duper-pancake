@@ -517,14 +517,13 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
         if (complexity < threshold) {
             return false;
         }
-        if (!this.requireCommentForLine(section.low, this.sourceMap, "sectionstart: " + complexity + " - (" + section.low + "-" + section.high + ")")) {
+        if (!this.requireCommentForLine(section.low, this.sourceMap)) {
             const findCommentRequirementLocation = (): boolean => {
                 const highestComplexity = lineComplexities.dequeue();
                 if (!highestComplexity || highestComplexity.complexity < lineThreshold) {
                     return true;
                 }
-                const reason = "most complex: " + highestComplexity.complexity + " - total: " + complexity + " - (" + section.low + "-" + section.high + ")";
-                return this.requireCommentForLine(highestComplexity.line, this.sourceMap, reason);
+                return this.requireCommentForLine(highestComplexity.line, this.sourceMap);
             };
             // tslint:disable-next-line:no-empty
             while (!findCommentRequirementLocation()) {}
@@ -545,6 +544,7 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
         if (!enclosingNode) {
             return false;
         }
+
         // Try to find comments that are (spatially) close to the line that requires a comment
         line = sourceMap.sourceFile.getLineAndCharacterOfPosition(enclosingNode.getStart()).line;
         const nearestComments = sourceMap.getCommentsWithDistanceClosestToLine(line);
@@ -584,11 +584,11 @@ export class HighCommentQualityWalkerV2<T> extends Lint.AbstractWalker<T> {
 
         // Add a comment if nothing has been found before
         if (!qualityCommentPresent) {
-            failureMessage = failureMessage || "This line should be commented";
+            failureMessage = failureMessage || "A comment near this line would improve code understandability";
             if (this.requiredCommentLines.has(line)) {
-                this.requiredCommentLines.get(line).push(failureMessage);
-                // TODO: this is here to allow multiple requirements per line during development
-                // but also force the rest of the code to search for additional lines that should have comments
+                // This allows multiple requirements per line during development
+                // ```this.requiredCommentLines.get(line).push(failureMessage);```
+                // This forces the rest of the code to search for additional lines that should have comments
                 return false;
             } else {
                 this.requiredCommentLines.set(line, [failureMessage]);
