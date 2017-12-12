@@ -32,6 +32,7 @@ export class CommentClassifier {
         const classifications: ICommentClassification[] = [];
         const enclosingNodes = this.sourceMap.getEnclosingNodes(comment);
 
+        // Add "Inline" comment class if node is contained in a function
         for (const parentNode of enclosingNodes) {
             if (parentNode && ts.isFunctionLike(parentNode)) {
                 classifications.push({commentClass: CommentClass.Inline});

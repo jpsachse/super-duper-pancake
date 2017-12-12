@@ -94,13 +94,17 @@ export default class Utils {
         const result: T[] = [];
         let i = 0;
         let o = 0;
+        // Iterate over both sorted arrays.
+        // Push elements that are contained in both to the results array.
         while (i < first.length && o < second.length) {
             if (first[i] === second[o]) {
+
                 result.push(first[o]);
                 i++;
                 o++;
             } else if (first[i] < second[o]) {
                 i++;
+
             } else {
                 o++;
             }

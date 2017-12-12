@@ -32,12 +32,14 @@ export class LinesOfCodeCollector implements IMetricCollector {
         let linesOfCode = 0;
         let position = codeNode.getStart();
 
+        // Actually count the number of lines with code in them
         textLines.forEach((line, index) => {
             if (Utils.isCodeInLine(position, sourceFile, line)) {
                 linesOfCode += 1;
             }
             position += line.length + 1;
         });
+
         this.linesOfCode.set(node, linesOfCode);
     }
 

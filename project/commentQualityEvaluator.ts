@@ -151,8 +151,6 @@ export class CommentQualityEvaluator {
                                      declaration: ts.Declaration,
                                      sourceMap: SourceMap,
                                      classifications: ICommentClassification[]): EvaluationResult {
-        // TODO: this has to be refined considerably, e.g., by stripping common fill words (a, this, any, ...)
-        // and also add handling for texts that reference parameters of functions
         const evaluationResult = new EvaluationResult(CommentQuality.Low, []);
         const jsDocs = comment.getCompleteComment().jsDoc;
         let commentText: string;
