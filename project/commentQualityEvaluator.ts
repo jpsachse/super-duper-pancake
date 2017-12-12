@@ -1,4 +1,5 @@
 import * as compendium from "compendium-js";
+import * as pluralize from "pluralize";
 import * as stopword from "stopword";
 import * as ts from "typescript";
 import { ICommentClassification } from "./commentClassificationTypes";
@@ -322,10 +323,11 @@ export class CommentQualityEvaluator {
     private normaliseWords(words: string[]): string[] {
         const inflector = compendium.inflector;
         const result: string[] = [];
-        return words.map((word, index) => {
-            const normalized = inflector.infinitive(word);
-            return normalized ? normalized : word;
-        });
+        return Array.from(new Set(words.map((word, index) => {
+            const singular = pluralize.singular(word);
+            const normalized = inflector.infinitive(singular);
+            return normalized ? normalized : singular;
+        })));
     }
 
 }
