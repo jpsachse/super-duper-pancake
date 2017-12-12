@@ -1,0 +1,11 @@
+2017-11-26:
+Average agreement: 0.501400560224
+Average agreement (skipping first): 0.345622119816
+Average agreement (fuzzy): 0.659197012138
+Average agreement (fuzzy, skipping first): 0.576036866359
+
+2017-11-28:
+Average agreement: 0.528685548293
+Average agreement (skipping first): 0.382317801673
+Average agreement (fuzzy): 0.679738562092
+Average agreement (fuzzy, skipping first): 0.605734767025
